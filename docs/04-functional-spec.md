@@ -4,6 +4,7 @@
 |---|---|---|
 | 0.1 | 2026-11-24 | 초안 |
 | 0.2 | 2026-11-24 | Phase 1 구현에 맞춰 구조·CLI·설정·discovered.json·종료 코드 확정 (D-03, D-06, D-08, D-09, D-11, D-14 반영) |
+| 0.3 | 2026-11-24 | Phase 2: `generate`, `--discovered`, `pdf.*`·`selection.order` 설정, manifest.json·report.md, PDF 링크·북마크 규칙 (D-07, D-10, D-15 반영) |
 
 ## 1. 구조
 ```text
@@ -17,7 +18,10 @@ site2pdf/
       browser/             # Chromium 실행, 안전 컨텍스트, 페이지 로더(실패 판정)
       discover/            # BFS 탐색, robots, 선택(include/exclude)
       audit/               # 사전 진단
-      report/              # 출력 JSON, 로그 마스킹
+      render/              # 인쇄 준비(범용 CSS·본문 영역·표·넘침 탐지·앵커 프로브), 페이지 1개 PDF
+      pdf/                 # 링크 재작성·북마크·병합(pdf-lib), 텍스트 추출(pdfjs), 파일명
+      generate/            # 변환 대상 확정, generate 명령
+      report/              # 출력 JSON, report.md, 로그 마스킹
       session.ts           # 모드별 실행 구성
     tests/{unit,integration,e2e}/
   frontend/                # 예약 (GUI는 MVP 범위 밖)
@@ -33,10 +37,12 @@ site2pdf/
 npm run cli -- audit    --url https://example.com/docs [--config ./site.json] [--output ./output]
 npm run cli -- discover --url https://example.com/docs [--config ./site.json] [--output ./output]
 npm run cli -- discover --source ./dist-site [--config ./local.json] [--output ./output]
-# Phase 2 이후
-site2pdf generate ...
+npm run cli -- generate --source ./dist-site [--config ./local.json] [--output ./output] [--discovered ./output/discovered.json]
+# Phase 3 예정
 site2pdf validate --manifest ./output/manifest.json
 ```
+- 권장 흐름: `discover` → `discovered.json` 검수(필요하면 `selection` 설정 수정 후 다시 discover) → `generate --discovered`.
+- `--discovered`: 검수한 목록으로 변환한다. 설정 해시(`configHash`)와 모드가 같아야 하며, 목록의 각 경로는 현재 범위로 다시 검증한다(목록 파일을 고쳐 범위를 넓힐 수 없음). 없으면 `generate`가 탐색부터 다시 하고 `discovered.json`도 쓴다.
 - `--url`: 원격 HTTPS. 소유 또는 명시적 수집 권한이 있는 사이트만. userinfo가 들어간 URL은 거부.
 - `--source`: 로컬 빌드 폴더. `--url`과 함께 쓸 수 없다. CLI 입력이 있으면 설정 파일의 입력 필드를 대체한다.
 - `--config`/`-c`: 설정 JSON. 상대 경로(`sourcePath`)는 설정 파일 위치 기준.
@@ -70,8 +76,20 @@ site2pdf validate --manifest ./output/manifest.json
     "minTextLength": 20,                  // 본문 글자 수 미만이면 실패
     "quietMs": 500                        // DOM 변경 정지 시간
   },
-  "selection": { "include": ["/docs/**"], "exclude": ["/docs/private/**"] },  // 경로 glob(picomatch)
-  "pdf": {}                               // Phase 2에서 확정, 현재는 보존만
+  "selection": {
+    "include": ["/docs/**"], "exclude": ["/docs/private/**"],   // 경로 glob(picomatch)
+    "order": ["/docs/intro.html"]         // ([]) 통합 PDF 앞쪽에 둘 경로 순서. 나머지는 발견 순서
+  },
+  "pdf": {
+    "pageSize": "A4",                     // A4 | A3 | Letter | Legal
+    "marginMm": 14,
+    "printBackground": true,
+    "pagewise": true,                     // 페이지별 PDF (FR-06)
+    "combined": true,                     // 통합 PDF (FR-07)
+    "title": "제품 개발자 문서",           // (시작 페이지 제목) 통합 PDF 제목 메타데이터 (FR-13)
+    "fileName": "site-combined",          // 통합 PDF 파일명(확장자 제외, 정제됨)
+    "groups": []                          // 그룹별 PDF(FR-11)는 Phase 3. 현재 빈 배열만 허용
+  }
 }
 ```
 - 원격 모드: `crawl.minDelayMs`는 500ms 이상이어야 한다.
@@ -97,13 +115,25 @@ site2pdf validate --manifest ./output/manifest.json
 - `egressDenied[]`: 이그레스 프록시가 거부한 목적지 요약
 ### audit.json
 시작 페이지 상태·리다이렉트·제목, 링크 통계(범위 안 수, 제외 사유별 수), sitemap(보조), 차단 내역, `findings`(사람이 읽는 진단 문장). 요청은 robots.txt·시작 페이지·sitemap.xml 각 1회.
-### manifest.json
-Phase 2에서 정의(렌더링 상태, 원본→출력 페이지 대응, PDF 경로).
+### manifest.json (generate)
+- 메타: discovered.json과 같은 항목 + `discoveredFrom`(파일 경로 또는 `inline-discover`)
+- `summary`: `planned`, `rendered`, `failed`, `skipped`, `warnings`
+- `combined`: `file`, `pages`, `outlineEntries`, `links`(`gotos` 내부 이동, `anchorExact` 앵커 위치까지 정확, `removed`, `kept` 외부 유지, `brokenNamed`)
+- `pages[]`: `order`, `url`, `path`, `title`, `titleSource`(h1|title|path), `status`(rendered|failed), `failure`, `pdfFile`, `pdfPages`, `combinedStartPage`, `warnings`, `qa`(`coverage`, `overflow`, `tightTables`, `missingSamples`), `blocked`, `elapsedMs`
+- `skipped[]`: 변환 대상에서 빠진 경로와 사유(discover 실패, 선택 제외, 범위 밖, 중복, robots)
+- 경고: `unsupported-content:<태그>x<수>`, `horizontal-overflow:<태그>`, `text-coverage:<비율>`(0.99 미만), `blocked-requests:<수>`, `duplicate-title`
+### report.md
+사람이 읽는 요약(결과·페이지 표·제외·차단·경고 의미)과 육안 검수 체크리스트(07 §3).
+### PDF 파일
+- `pdf/pages/NNN-<정제된 제목>.pdf`: 페이지별 PDF. 이전 실행의 `NNN-*.pdf`는 지운다.
+- `pdf/<fileName>.pdf`: 통합 PDF. 장 = 페이지, 북마크는 장 아래 해당 페이지의 제목(h2…) 계층.
+- 장 제목: 본문 첫 `h1` → 문서 `title` → 경로 순. 같은 제목이 여러 번이면 `duplicate-title` 경고.
+- 링크(D-10): 포함 페이지로 가는 링크는 통합 PDF 안 이동(앵커가 있으면 그 위치), 제외·범위 밖 같은 사이트 링크는 링크만 제거(텍스트 유지), 다른 사이트 링크는 유지. 페이지별 PDF에서 포함 페이지 링크는 원격이면 웹 주소로 유지, 로컬이면 제거(루프백 주소 노출 방지).
 
 ## 6. 종료 코드
 | 코드 | 의미 | 예 |
 |---|---|---|
 | `0` | 모든 필수 단계 성공 | 한도(maxPages 등) 도달은 성공이되 `message`·`stopReason`에 표시 |
-| `2` | 입력·설정·권한 확인 실패 | 잘못된 URL·설정, robots 금지·확인 실패, 401/403/429 |
-| `3` | 탐색·렌더링·변환 실패 | 일부 페이지 실패, 시작 페이지 실패, 브라우저 실행 실패 |
+| `2` | 입력·설정·권한 확인 실패 | 잘못된 URL·설정, robots 금지·확인 실패, 401/403/429, `--discovered` 설정 불일치 |
+| `3` | 탐색·렌더링·변환 실패 | 일부 페이지 실패(통합 PDF는 성공 페이지만으로 만들되 실패로 표시), 시작 페이지 실패, 변환 대상 0개, 브라우저 실행 실패 |
 | `4` | 보안 정책 위반 | 시작 호스트가 비공개 주소로 해석, 시작 페이지가 범위 밖으로 리다이렉트 |

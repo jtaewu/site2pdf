@@ -2,7 +2,7 @@
 
 승인된 웹사이트 URL 또는 로컬 정적 사이트를 **안전하게 탐색**해 PDF로 내보내는 CLI입니다. 특정 문서 플랫폼에 종속되지 않습니다.
 
-> 현재 단계: **Phase 1 (CLI·설정·안전한 탐색)** — `audit`, `discover` 명령까지 구현되어 있습니다. PDF 생성(`generate`)은 Phase 2 예정입니다.
+> 현재 단계: **Phase 2 (PDF 생성)** 완료 — `audit`, `discover`, `generate` 명령을 쓸 수 있습니다. 검증 명령·그룹별 PDF는 Phase 3 예정입니다.
 
 ## 빠른 시작
 
@@ -11,14 +11,23 @@ cd backend
 npm install
 npm run browser:install          # 전용 Chromium 설치 (최초 1회, 약 150MB)
 
-# 로컬 정적 사이트 탐색 (외부 네트워크 사용 안 함)
+# 로컬 정적 사이트: 탐색 → 목록 검수 → PDF 생성 (외부 네트워크 사용 안 함)
 npm run cli -- discover -c ../config/examples/local-static.json -o ../output
+npm run cli -- generate -c ../config/examples/local-static.json -o ../output --discovered ../output/discovered.json
 
 # 원격 사이트 진단 (소유 또는 명시적 수집 권한이 있는 HTTPS 사이트만)
 npm run cli -- audit --url https://docs.example.com/docs/ -o ../output
 ```
 
-결과는 `output/discovered.json`, `output/audit.json`에 저장됩니다. 종료 코드: `0` 성공, `2` 입력·설정·권한 문제(접근 거부·robots 금지 포함), `3` 탐색 실패(일부 실패 포함), `4` 보안 정책 위반.
+결과:
+- `output/pdf/<파일명>.pdf`: 통합 PDF (장별 북마크, 문서 안 링크 이동)
+- `output/pdf/pages/NNN-제목.pdf`: 페이지별 PDF
+- `output/manifest.json`, `output/report.md`: 페이지별 결과·경고와 **육안 검수 체크리스트**
+- `output/discovered.json`, `output/audit.json`: 탐색·진단 결과
+
+종료 코드: `0` 성공, `2` 입력·설정·권한 문제(접근 거부·robots 금지 포함), `3` 탐색·변환 실패(일부 실패 포함), `4` 보안 정책 위반.
+
+자동 검사는 잘림·누락의 일부만 잡습니다. 배포 전에 `report.md`의 체크리스트로 PDF를 직접 확인하세요.
 
 ## 안전 원칙
 

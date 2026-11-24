@@ -4,7 +4,7 @@ import type { SelectionConfig } from '../config/schema.ts';
 
 export type SelectionResult = { selected: true } | { selected: false; reason: string };
 
-export function createSelector(sel: SelectionConfig): (url: string) => SelectionResult {
+export function createSelector(sel: Pick<SelectionConfig, 'include' | 'exclude'>): (url: string) => SelectionResult {
   const opts = { dot: true };
   const includes = sel.include.map((p) => [p, picomatch(p, opts)] as const);
   const excludes = sel.exclude.map((p) => [p, picomatch(p, opts)] as const);

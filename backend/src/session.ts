@@ -1,5 +1,5 @@
 // 실행 세션: 입력 모드에 맞춰 로컬 서버·이그레스 프록시·브라우저·안전 컨텍스트를 한 번에 구성하고 정리한다.
-import type { Browser } from 'playwright';
+import type { Browser, BrowserContext } from 'playwright';
 import type { Config } from './config/schema.ts';
 import { ExitCode, Site2pdfError } from './errors.ts';
 import { startEgressProxy, systemResolver, type EgressProxy, type Resolver } from './fetch-policy/egress-proxy.ts';
@@ -25,6 +25,8 @@ export type Session = {
   /** 로컬 모드의 임시 서버 origin (원격이면 null) */
   localOrigin: string | null;
   load: PageLoader;
+  /** 렌더링용 안전 컨텍스트 (L-B) */
+  context: BrowserContext;
   fetchText: RobotsFetch;
   robots: RobotsPolicy;
   blocked: BlockedRequest[];
@@ -108,6 +110,7 @@ export async function openSession(config: Config, opts: SessionOptions = {}): Pr
       scope,
       localOrigin: localServer?.origin ?? null,
       load: createBrowserPageLoader(context, config.render, config.crawl.timeoutMs),
+      context,
       fetchText,
       robots,
       blocked,

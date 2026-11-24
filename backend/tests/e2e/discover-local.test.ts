@@ -24,7 +24,7 @@ const writeCfg = (dir: string, data: unknown) => {
 };
 
 describe('로컬 정적 사이트 (fixtures/static-site)', () => {
-  it('CLI discover: 6페이지 발견, 범위 밖 링크 제외, 외부 이미지 차단, 종료 코드 0', async () => {
+  it('CLI discover: 7페이지 발견, 범위 밖 링크 제외, 외부 이미지 차단, 종료 코드 0', async () => {
     const out = tmpOut();
     const cfg = writeCfg(out, {
       mode: 'local', sourcePath: path.join(FIX, 'static-site'), startPath: '/docs/index.html',
@@ -37,11 +37,12 @@ describe('로컬 정적 사이트 (fixtures/static-site)', () => {
     const d = JSON.parse(fs.readFileSync(path.join(out, 'discovered.json'), 'utf8'));
     expect(d.pages.map((p: { path: string }) => p.path)).toEqual([
       '/docs/index.html', '/docs/guide/intro.html', '/docs/guide/install.html', '/docs/api/overview.html', '/docs/api/reference.html', '/docs/list.html',
+      '/docs/guide/media.html', // 깊이 2 (intro 본문 링크)
     ]);
     expect(d.pages.every((p: { status: string }) => p.status === 'ok')).toBe(true);
     // T-10: 선택 제외는 기록만 하고 탐색 목록에는 남는다
-    expect(d.pages.at(-1)).toMatchObject({ selected: false, selectionReason: 'selection-exclude:/docs/list.html' });
-    expect(d.result.counts).toMatchObject({ pages: 6, ok: 6, failed: 0, selected: 5 });
+    expect(d.pages[5]).toMatchObject({ path: '/docs/list.html', selected: false, selectionReason: 'selection-exclude:/docs/list.html' });
+    expect(d.result.counts).toMatchObject({ pages: 7, ok: 7, failed: 0, selected: 6 });
     const reasons = Object.fromEntries(d.excluded.map((e: { url: string; reason: string }) => [e.url.replace(/^http:\/\/127\.0\.0\.1:\d+/, ''), e.reason]));
     expect(reasons).toMatchObject({
       '/logout': 'path-out-of-scope', 'https://example.invalid/external': 'origin-out-of-scope', '/admin/': 'path-out-of-scope',

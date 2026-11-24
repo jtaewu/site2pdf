@@ -19,7 +19,7 @@ export type LoadResult = {
 
 export type PageLoader = (url: string) => Promise<LoadResult>;
 
-/** load → networkidle(최대) → DOM 변경이 quietMs 동안 없을 때까지, 전체 상한 timeoutMs */
+/** load → networkidle(최대) → DOM 변경이 quietMs 동안 없을 때까지, 전체 상한 deadline */
 async function waitForStable(page: Page, deadline: number, quietMs: number): Promise<boolean> {
   const left = () => Math.max(1, deadline - Date.now());
   await page.waitForLoadState('load', { timeout: left() });
@@ -46,58 +46,79 @@ async function waitForStable(page: Page, deadline: number, quietMs: number): Pro
   );
 }
 
+/** 글꼴·이미지 로딩 완료 대기 (상한 있음) */
+async function waitForAssets(page: Page, deadline: number): Promise<void> {
+  const left = Math.max(1, deadline - Date.now());
+  await Promise.race([
+    page.evaluate(() =>
+      Promise.all([
+        document.fonts.ready,
+        ...[...document.images].filter((i) => !i.complete).map((i) => new Promise((r) => { i.onload = i.onerror = r; })),
+      ]),
+    ),
+    new Promise((r) => setTimeout(r, left)),
+  ]).catch(() => {});
+}
+
+/**
+ * 새 탭에서 url을 열고 판정까지 한다. 성공·실패와 관계없이 page를 돌려주므로 호출자가 닫아야 한다.
+ */
+export async function openPage(context: BrowserContext, url: string, render: RenderConfig, timeoutMs: number): Promise<{ page: Page; result: LoadResult }> {
+  const started = Date.now();
+  const deadline = started + timeoutMs;
+  const page = await context.newPage();
+  const base = { httpStatus: 0, finalUrl: url, redirectChain: [] as string[], title: '', links: [] as string[], textLength: 0 };
+  const done = (r: Partial<LoadResult>) => ({ page, result: { ...base, ...r, elapsedMs: Date.now() - started } });
+
+  let response;
+  try {
+    response = await page.goto(url, { waitUntil: 'commit', timeout: timeoutMs });
+  } catch (e) {
+    return done({ failure: `navigation-error: ${(e as Error).message.split('\n')[0]}` });
+  }
+  if (!response) return done({ failure: 'no-response' });
+  const chain: string[] = [];
+  for (let r = response.request().redirectedFrom(); r; r = r.redirectedFrom()) chain.unshift(r.url());
+  base.redirectChain = chain;
+  base.httpStatus = response.status();
+  base.finalUrl = response.url();
+  // 이그레스 프록시가 막은 응답은 사이트의 접근 거부와 구분한다
+  const egressBlock = response.headers()['x-site2pdf-blocked'];
+  if (egressBlock) return done({ failure: `egress-blocked:${egressBlock}` });
+  if (response.status() >= 400) return done({ failure: `http-${response.status()}` });
+
+  const stable = await waitForStable(page, deadline, render.quietMs).catch(() => false);
+  // 렌더 중 최상위 문서가 범위 밖으로 이동하면(차단되어 에러 페이지가 됨) 실패 처리 (ADR-004 후속)
+  if (page.url().startsWith('chrome-error://')) return done({ failure: 'navigated-to-error-page' });
+  base.finalUrl = page.url();
+  if (render.readySelector) {
+    const left = Math.max(1, deadline - Date.now());
+    const found = await page.waitForSelector(render.readySelector, { state: 'attached', timeout: left }).then(() => true, () => false);
+    if (!found) return done({ failure: 'ready-selector-not-found' });
+  } else if (!stable) {
+    return done({ failure: 'render-timeout' });
+  }
+  await waitForAssets(page, deadline);
+  const info = await page.evaluate((contentSelector) => {
+    const root = contentSelector ? document.querySelector(contentSelector) : document.body;
+    const links = [...document.querySelectorAll('a[href]')].map((a) => {
+      const raw = a.getAttribute('href')!.trim();
+      return /^(javascript|mailto|tel|data):/i.test(raw) ? raw : (a as HTMLAnchorElement).href;
+    });
+    return { found: !!root, text: root ? (root as HTMLElement).innerText.trim().length : 0, links, title: document.title };
+  }, render.contentSelector ?? null);
+  base.title = info.title;
+  base.links = info.links;
+  base.textLength = info.text;
+  if (!info.found) return done({ failure: 'content-selector-not-found' });
+  if (info.text < render.minTextLength) return done({ failure: 'content-too-short' });
+  return done({});
+}
+
 export function createBrowserPageLoader(context: BrowserContext, render: RenderConfig, timeoutMs: number): PageLoader {
   return async (url) => {
-    const started = Date.now();
-    const deadline = started + timeoutMs;
-    const page = await context.newPage();
-    const base = { httpStatus: 0, finalUrl: url, redirectChain: [] as string[], title: '', links: [] as string[], textLength: 0 };
-    const done = (r: Partial<LoadResult>): LoadResult => ({ ...base, ...r, elapsedMs: Date.now() - started });
-    try {
-      let response;
-      try {
-        response = await page.goto(url, { waitUntil: 'commit', timeout: timeoutMs });
-      } catch (e) {
-        return done({ failure: `navigation-error: ${(e as Error).message.split('\n')[0]}` });
-      }
-      if (!response) return done({ failure: 'no-response' });
-      const chain: string[] = [];
-      for (let r = response.request().redirectedFrom(); r; r = r.redirectedFrom()) chain.unshift(r.url());
-      base.redirectChain = chain;
-      base.httpStatus = response.status();
-      base.finalUrl = response.url();
-      // 이그레스 프록시가 막은 응답은 사이트의 접근 거부와 구분한다
-      const egressBlock = response.headers()['x-site2pdf-blocked'];
-      if (egressBlock) return done({ failure: `egress-blocked:${egressBlock}` });
-      if (response.status() >= 400) return done({ failure: `http-${response.status()}` });
-
-      const stable = await waitForStable(page, deadline, render.quietMs).catch(() => false);
-      // 렌더 중 최상위 문서가 범위 밖으로 이동하면(차단되어 에러 페이지가 됨) 실패 처리 (ADR-004 후속)
-      if (page.url().startsWith('chrome-error://')) return done({ failure: 'navigated-to-error-page' });
-      base.finalUrl = page.url();
-      if (render.readySelector) {
-        const left = Math.max(1, deadline - Date.now());
-        const found = await page.waitForSelector(render.readySelector, { state: 'attached', timeout: left }).then(() => true, () => false);
-        if (!found) return done({ failure: 'ready-selector-not-found' });
-      } else if (!stable) {
-        return done({ failure: 'render-timeout' });
-      }
-      const info = await page.evaluate((contentSelector) => {
-        const root = contentSelector ? document.querySelector(contentSelector) : document.body;
-        const links = [...document.querySelectorAll('a[href]')].map((a) => {
-          const raw = a.getAttribute('href')!.trim();
-          return /^(javascript|mailto|tel|data):/i.test(raw) ? raw : (a as HTMLAnchorElement).href;
-        });
-        return { found: !!root, text: root ? (root as HTMLElement).innerText.trim().length : 0, links, title: document.title };
-      }, render.contentSelector ?? null);
-      base.title = info.title;
-      base.links = info.links;
-      base.textLength = info.text;
-      if (!info.found) return done({ failure: 'content-selector-not-found' });
-      if (info.text < render.minTextLength) return done({ failure: 'content-too-short' });
-      return done({});
-    } finally {
-      await page.close().catch(() => {});
-    }
+    const { page, result } = await openPage(context, url, render, timeoutMs);
+    await page.close().catch(() => {});
+    return result;
   };
 }

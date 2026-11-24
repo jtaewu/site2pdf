@@ -2,8 +2,14 @@
   "mode": "remote",
   "startUrl": "https://docs.example.com/docs/",
   "scope": {
-    "pathPrefixes": ["/docs"],
-    "denyPatterns": ["/admin", "/logout", "?download="]
+    "pathPrefixes": [
+      "/docs"
+    ],
+    "denyPatterns": [
+      "/admin",
+      "/logout",
+      "?download="
+    ]
   },
   "crawl": {
     "maxPages": 200,
@@ -12,9 +18,32 @@
     "timeoutMs": 15000,
     "maxTotalMs": 600000,
     "respectRobotsTxt": true,
-    "query": { "policy": "drop", "keepParams": [] }
+    "query": {
+      "policy": "drop",
+      "keepParams": []
+    }
   },
-  "resources": { "allowedOrigins": [] },
-  "render": { "minTextLength": 20 },
-  "selection": { "include": ["/docs/**"], "exclude": ["/docs/private/**"] }
+  "resources": {
+    "allowedOrigins": []
+  },
+  "render": {
+    "minTextLength": 20
+  },
+  "selection": {
+    "include": [
+      "/docs/**"
+    ],
+    "exclude": [
+      "/docs/private/**"
+    ],
+    "order": []
+  },
+  "pdf": {
+    "pageSize": "A4",
+    "marginMm": 14,
+    "pagewise": true,
+    "combined": true,
+    "title": "예시 개발자 문서",
+    "fileName": "example-docs"
+  }
 }

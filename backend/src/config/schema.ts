@@ -33,9 +33,9 @@ export const renderSchema = z
   .object({
     /** 이 선택자가 나타나야 렌더 완료로 본다 */
     readySelector: z.string().min(1).optional(),
-    /** 본문 영역. 지정 시 이 요소가 없으면 실패, 본문 길이도 이 요소 기준 */
+    /** 본문 영역. 지정 시 이 요소가 없으면 실패, 본문 길이도 이 요소 기준. 인쇄도 이 영역만 */
     contentSelector: z.string().min(1).optional(),
-    /** 인쇄 시 숨길 요소 (Phase 2 렌더링에서 사용) */
+    /** 인쇄 시 숨길 요소 */
     hideSelectors: z.array(z.string().min(1)).default([]),
     /** 본문 텍스트가 이보다 짧으면 렌더 실패로 판정 (D-14) */
     minTextLength: z.number().int().min(0).default(20),
@@ -49,6 +49,27 @@ export const selectionSchema = z
     /** 경로 glob (예: /docs/**). 비어 있으면 범위 안 전체 포함 */
     include: z.array(z.string().min(1)).default([]),
     exclude: z.array(z.string().min(1)).default([]),
+    /** 통합 PDF에서 앞에 둘 페이지 경로(pathname+search)의 순서. 나머지는 발견 순서 (SC-04) */
+    order: z.array(z.string().startsWith('/')).default([]),
+  })
+  .strict();
+
+export const pdfSchema = z
+  .object({
+    pageSize: z.enum(['A4', 'A3', 'Letter', 'Legal']).default('A4'),
+    /** 페이지 여백(mm) */
+    marginMm: z.number().min(0).max(50).default(14),
+    printBackground: z.boolean().default(true),
+    /** 페이지별 PDF 생성 (FR-06) */
+    pagewise: z.boolean().default(true),
+    /** 통합 PDF 생성 (FR-07) */
+    combined: z.boolean().default(true),
+    /** 통합 PDF 제목 메타데이터 (FR-13). 없으면 시작 페이지 제목 */
+    title: z.string().min(1).max(200).optional(),
+    /** 통합 PDF 파일 이름(확장자 제외, FR-13) */
+    fileName: z.string().min(1).max(80).default('site-combined'),
+    /** 그룹별 PDF (FR-11): Phase 3 예정. 현재는 빈 배열만 허용 */
+    groups: z.array(z.unknown()).max(0, 'pdf.groups(그룹별 PDF)는 Phase 3에서 지원합니다').default([]),
   })
   .strict();
 
@@ -56,9 +77,8 @@ const common = {
   scope: scopeSchema.default({ allowedOrigins: [], pathPrefixes: ['/'], denyPatterns: [] }),
   crawl: crawlSchema.default(crawlSchema.parse({})),
   render: renderSchema.default(renderSchema.parse({})),
-  selection: selectionSchema.default({ include: [], exclude: [] }),
-  /** Phase 2에서 확정. Phase 1은 값을 보존만 한다 */
-  pdf: z.record(z.string(), z.unknown()).default({}),
+  selection: selectionSchema.default({ include: [], exclude: [], order: [] }),
+  pdf: pdfSchema.default(pdfSchema.parse({})),
 };
 
 export const remoteConfigSchema = z
@@ -91,3 +111,4 @@ export type LocalConfig = z.infer<typeof localConfigSchema>;
 export type CrawlConfig = z.infer<typeof crawlSchema>;
 export type RenderConfig = z.infer<typeof renderSchema>;
 export type SelectionConfig = z.infer<typeof selectionSchema>;
+export type PdfConfig = z.infer<typeof pdfSchema>;

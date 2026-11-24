@@ -2,6 +2,21 @@
   "mode": "local",
   "sourcePath": "../../fixtures/static-site",
   "startPath": "/docs/index.html",
-  "scope": { "pathPrefixes": ["/docs"], "denyPatterns": ["/private/"] },
-  "crawl": { "maxPages": 50, "maxDepth": 3, "minDelayMs": 0 }
+  "scope": {
+    "pathPrefixes": [
+      "/docs"
+    ],
+    "denyPatterns": [
+      "/private/"
+    ]
+  },
+  "crawl": {
+    "maxPages": 50,
+    "maxDepth": 3,
+    "minDelayMs": 0
+  },
+  "pdf": {
+    "title": "Fixture 문서",
+    "fileName": "site-combined"
+  }
 }
