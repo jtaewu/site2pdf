@@ -96,3 +96,20 @@ site2pdf.cmd validate --manifest out/manifest.json
 2. `audit --source <빌드>`로 본문 영역 후보와 링크 수를 확인한다.
 3. 사이트 전용 설정을 `config/examples/<사이트>.json`으로 만든다. 엔진 코드는 고치지 않는다.
 4. discover → 목록 검수 → generate → validate → `report.md` 육안 검수 → 담당자 승인 후 배포.
+
+## 9. 내부망(인터넷 없는 PC)으로 옮기기
+반입 용량 제한(예: 200MB)이 있어도 되도록, 실행에 필요한 것만 모아 압축하고 190MB 조각으로 나눈다. 시험 결과 **전체 약 160MB, 1개 파일**이다(브라우저는 헤드리스용만, 라이브러리는 실행용만 포함).
+
+**인터넷 PC에서** (저장소를 받고 `cd backend; npm.cmd ci; npm.cmd run browser:install` 를 끝낸 상태)
+```powershell
+cd C:\site2pdf
+.\make-offline-bundle.cmd            # 결과: C:\site2pdf-offline
+```
+`C:\site2pdf-offline`의 `site2pdf-offline.zip.001`(…002…), `restore.cmd`, `안내.txt`와 Node.js 24 설치 파일(.msi)을 옮긴다.
+
+**내부망 PC에서**
+1. Node.js 설치
+2. 옮긴 파일을 한 폴더에 모으고 `restore.cmd` 더블클릭 → `C:\site2pdf`에 설치, 브라우저 경로 설정, 샘플 변환까지 자동 확인
+3. 새 PowerShell 창에서 `cd C:\site2pdf` → `.\site2pdf.cmd generate --source C:\sample-site -o C:\result`
+
+다른 위치에 설치하려면 명령 프롬프트에서 `restore.cmd D:\tools\site2pdf`처럼 경로를 넘긴다. PowerShell에서 `npm`이 실행 정책 오류를 내면 `npm.cmd`를 쓴다.

@@ -16,6 +16,12 @@ npm run browser:install          # 전용 Chromium 설치 (약 150MB)
 cd ..
 ```
 
+### 인터넷이 안 되는 내부망 PC로 옮기기
+
+인터넷 PC에서 `.\make-offline-bundle.cmd`를 실행하면 `C:\site2pdf-offline`에 반입 파일이 생깁니다(약 160MB, 190MB 단위로 자동 분할). 이 파일들과 Node.js 설치 파일을 옮긴 뒤, 내부망 PC에서 `restore.cmd`를 더블클릭하면 설치와 동작 확인까지 끝납니다. 자세한 내용은 [docs/10-user-guide.md](docs/10-user-guide.md) §9.
+
+> PowerShell에서 `npm`이 "스크립트를 실행할 수 없으므로" 오류를 내면 `npm.cmd`로 입력하세요.
+
 ## 사용법
 
 저장소 폴더에서 실행기를 씁니다. Windows는 `site2pdf.cmd`, macOS·Linux·Git Bash는 `./site2pdf`입니다. 경로는 실행하는 위치 기준입니다.
