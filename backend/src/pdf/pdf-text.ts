@@ -20,7 +20,10 @@ export async function extractPdfText(bytes: Uint8Array): Promise<PdfTextInfo> {
 
 /** DOM 단어 중 PDF 텍스트에 존재하는 비율 (공백 무시) */
 export function textCoverage(words: string[], pdfText: string): { ratio: number; missing: string[] } {
-  const flat = pdfText.replace(/\s+/g, '');
-  const missing = words.filter((w) => !flat.includes(w));
+  // 보이지 않는 문자(제로폭 공백·결합자·BOM·이모지 변형 선택자)는 PDF 텍스트에서 빠지므로 비교에서 제외한다
+  // (예: Docusaurus 제목 끝의 U+200B 때문에 생기던 오탐)
+  const invisible = /[​-‍⁠﻿︎️]/g;
+  const flat = pdfText.replace(invisible, '').replace(/\s+/g, '');
+  const missing = words.map((w) => w.replace(invisible, '')).filter((w) => w && !flat.includes(w));
   return { ratio: words.length ? Number((1 - missing.length / words.length).toFixed(4)) : 1, missing: missing.slice(0, 10) };
 }

@@ -1,0 +1,64 @@
+{
+  "mode": "remote",
+  "startUrl": "https://docs.kicc.co.kr/docs/online-payment/getting-started",
+  "scope": {
+    "pathPrefixes": [
+      "/docs/online-payment"
+    ],
+    "denyPatterns": []
+  },
+  "crawl": {
+    "maxPages": 100,
+    "maxDepth": 10,
+    "minDelayMs": 1000,
+    "timeoutMs": 20000
+  },
+  "render": {
+    "contentSelector": "article",
+    "readySelector": "article h1"
+  },
+  "selection": {
+    "order": [
+      "/docs/online-payment/getting-started",
+      "/docs/online-payment/common/api-domain",
+      "/docs/online-payment/common/security",
+      "/docs/online-payment/common/exception-handling",
+      "/docs/online-payment/common/idempotency",
+      "/docs/online-payment/common/response-format",
+      "/docs/online-payment/common/special-character",
+      "/docs/online-payment/common/compatibility",
+      "/docs/online-payment/common/changelog",
+      "/docs/online-payment/general/introduction",
+      "/docs/online-payment/general/integration/register-tx",
+      "/docs/online-payment/general/integration/payment-window",
+      "/docs/online-payment/general/integration/approve-payment",
+      "/docs/online-payment/general/standalone/register-tx",
+      "/docs/online-payment/general/standalone/payment-window",
+      "/docs/online-payment/general/standalone/approve-payment",
+      "/docs/online-payment/general/standalone/more-information/free-inst-inquiry",
+      "/docs/online-payment/general/standalone/more-information/coupon-inquiry",
+      "/docs/online-payment/billing/introduction",
+      "/docs/online-payment/billing/register-window",
+      "/docs/online-payment/billing/issue-key",
+      "/docs/online-payment/billing/delete-key",
+      "/docs/online-payment/billing/payment",
+      "/docs/online-payment/management/cancel",
+      "/docs/online-payment/management/refund",
+      "/docs/online-payment/management/query-status",
+      "/docs/online-payment/services/escrow/status-change",
+      "/docs/online-payment/services/multi-settlement/register-seller",
+      "/docs/online-payment/services/sms/introduction",
+      "/docs/online-payment/services/sms/register-tx",
+      "/docs/online-payment/services/sms/cancel-tx",
+      "/docs/online-payment/services/cash-receipt/issue",
+      "/docs/online-payment/services/cash-receipt/cancel",
+      "/docs/online-payment/services/webhook",
+      "/docs/online-payment/ai-solutions/llm",
+      "/docs/online-payment/ai-solutions/mcp"
+    ]
+  },
+  "pdf": {
+    "title": "KICC 개발자 센터 - 온라인 결제",
+    "fileName": "kicc-online-payment"
+  }
+}

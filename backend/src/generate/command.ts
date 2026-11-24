@@ -152,10 +152,25 @@ export async function runGenerate(config: Config, configHash: string, outputDir:
       manifestPages.push(mp);
     }
 
-    // 중복 장 제목 경고 (06-technical-design §3)
-    const titleCount = new Map<string, number>();
-    for (const p of manifestPages) titleCount.set(p.title, (titleCount.get(p.title) ?? 0) + 1);
-    for (const p of manifestPages) if ((titleCount.get(p.title) ?? 0) > 1) p.warnings.push('duplicate-title');
+    // 중복 장 제목 (06-technical-design §3): 경로의 상위 폴더 이름을 붙여 북마크에서 구분되게 한다
+    // 예: '거래 등록' 두 개 → '거래 등록 (integration)', '거래 등록 (standalone)'
+    const count = (key: (p: ManifestPage) => string) => {
+      const m = new Map<string, number>();
+      for (const p of manifestPages) m.set(key(p), (m.get(key(p)) ?? 0) + 1);
+      return m;
+    };
+    const titleCount = count((p) => p.title);
+    for (const p of manifestPages) {
+      if ((titleCount.get(p.title) ?? 0) < 2) continue;
+      const parent = p.path.split('?')[0]!.replace(/\/+$/, '').split('/').slice(-2, -1)[0];
+      if (parent) {
+        p.title = `${p.title} (${decodeURIComponent(parent)})`;
+        p.warnings.push('duplicate-title-disambiguated');
+      }
+    }
+    const afterCount = count((p) => p.title);
+    for (const p of manifestPages) if ((afterCount.get(p.title) ?? 0) > 1) p.warnings.push('duplicate-title');
+    for (const part of parts) part.chapterTitle = manifestPages[part.index]!.title;
 
     // ---- 통합 PDF ----
     let combined: Awaited<ReturnType<typeof buildCombined>> | null = null;

@@ -71,6 +71,7 @@ export function renderReportMd(m: Manifest): string {
     '- `text-coverage:x`: 화면 텍스트 중 PDF에 없는 단어 비율이 1% 이상 → 잘림·누락 가능',
     '- `unsupported-content:태그`: iframe·video·canvas 등은 인쇄 결과가 화면과 다를 수 있음',
     '- `blocked-requests:n`: 범위 밖 리소스 차단 → 이미지·글꼴 누락 가능',
+    '- `duplicate-title-disambiguated`: 같은 장 제목이 여러 번 나와 상위 폴더 이름을 붙임 (예: 거래 등록 (integration))',
     '- `duplicate-title`: 같은 장 제목이 여러 번 나옴 → 북마크 구분 어려움',
     '- `sensitive-content:종류`: 토큰·키처럼 보이는 문자열 → 외부 배포 전 확인',
     '- `iframe-expanded:n`: 같은 사이트 iframe을 내용 높이만큼 펼쳐 인쇄함 → 쪽 나눔 확인',

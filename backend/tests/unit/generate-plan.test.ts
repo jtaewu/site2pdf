@@ -54,3 +54,11 @@ describe('변환 대상 확정 (SC-03, SC-04, T-10, T-15)', () => {
     expect(plan.orderNotFound).toEqual(['/docs/zzz']);
   });
 });
+
+describe('텍스트 커버리지 (보이지 않는 문자 오탐 방지)', () => {
+  it('제목 끝 제로폭 공백(U+200B)·이모지 변형 선택자는 누락으로 보지 않는다', async () => {
+    const { textCoverage } = await import('../../src/pdf/pdf-text.ts');
+    expect(textCoverage(['요청​', '파라미터​', '🛡️'], '요청 파라미터 🛡')).toEqual({ ratio: 1, missing: [] });
+    expect(textCoverage(['요청', '없는단어'], '요청')).toEqual({ ratio: 0.5, missing: ['없는단어'] });
+  });
+});

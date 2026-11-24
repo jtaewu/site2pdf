@@ -5,6 +5,7 @@
 | `remote.json` | 원격 HTTPS 사이트 (소유 또는 명시적 수집 권한이 있는 사이트만). `startUrl`은 예시 주소입니다 |
 | `local-static.json` | 로컬 정적 빌드 (`fixtures/static-site`) |
 | `local-spa.json` | 로컬 SPA 빌드 (`fixtures/spa-site`, History 라우팅) |
+| `kicc-online-payment.json` | KICC 개발자 센터 개발가이드 → 온라인결제 (원격, Docusaurus, 사이드바 순서 지정). 사이트 관리자 승인 범위에서만 사용 |
 
 - 상대 경로(`sourcePath`)는 설정 파일 위치 기준으로 해석됩니다.
 - 사이트별 특수 설정(`render.readySelector`, `render.contentSelector` 등)은 이 폴더에 예시로만 두고, 엔진 코드에 하드코딩하지 않습니다.
