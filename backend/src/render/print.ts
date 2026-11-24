@@ -42,6 +42,8 @@ export type PrepareResult = {
   tightTables: number;
   /** 텍스트 커버리지 계산용 단어 목록 */
   words: string[];
+  /** 본문 텍스트 (민감정보 검사용, 저장하지 않음) */
+  bodyText: string;
   probes: number;
   /** 내용 높이만큼 펼친 같은 사이트 iframe 수 */
   iframeExpanded: number;
@@ -190,8 +192,9 @@ export async function preparePrint(page: Page, render: RenderConfig, pdf: PdfCon
       document.body.appendChild(box);
 
       const h1 = document.body.querySelector('h1')?.textContent?.replace(/\s+/g, ' ').trim() || null;
-      const words = [...new Set(document.body.innerText.split(/\s+/).filter((w) => w.length >= 2))];
-      return { h1, unsupported, overflow: overflow.slice(0, 10).map(({ tag, right }) => ({ tag, right })), tightTables, words, probes: ids.length, iframeExpanded };
+      const bodyText = document.body.innerText;
+      const words = [...new Set(bodyText.split(/\s+/).filter((w) => w.length >= 2))];
+      return { h1, unsupported, overflow: overflow.slice(0, 10).map(({ tag, right }) => ({ tag, right })), tightTables, words, bodyText, probes: ids.length, iframeExpanded };
     },
     { contentSelector: render.contentSelector ?? null, hideSelectors: render.hideSelectors, maxProbes: MAX_PROBES, printCss: PRINT_CSS },
   );

@@ -25,6 +25,9 @@ export async function launchBrowser(opts: LaunchOptions): Promise<Browser> {
       '--disable-sync',
       '--no-pings',
       '--dns-prefetch-disable',
+      // WebRTC(UDP)는 HTTP 프록시를 거치지 않는다 → 프록시되지 않는 UDP 금지 (보안 감사 #1). 컨텍스트에서 API 자체도 제거한다
+      '--force-webrtc-ip-handling-policy=disable_non_proxied_udp',
+      '--webrtc-ip-handling-policy=disable_non_proxied_udp',
     ],
   });
 }

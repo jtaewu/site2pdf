@@ -78,6 +78,27 @@ describe('T-16 로컬 정적 서버 경계', () => {
     expect((await raw('/other/route')).status).toBe(404);
   });
 
+  it('감사 #3: Windows 8.3 짧은 이름으로 숨김 파일을 읽을 수 없다', async () => {
+    for (const p of ['/ENV~1', '/GIT~1/config', '/env~1']) {
+      const r = await raw(p);
+      expect(r.body).not.toContain('OUTSIDE_SECRET');
+      expect([403, 404]).toContain(r.status);
+    }
+  });
+
+  it('감사 #7: Host 헤더가 서버 주소와 다르면 거부(DNS 재바인딩 방지)', async () => {
+    const u = new URL(srv.origin);
+    const status = await new Promise<number>((resolve, reject) => {
+      const req = http.request({ host: u.hostname, port: u.port, path: '/docs/index.html', headers: { host: 'evil.example:80' } }, (res) => {
+        res.resume();
+        resolve(res.statusCode ?? 0);
+      });
+      req.on('error', reject);
+      req.end();
+    });
+    expect(status).toBe(421);
+  });
+
   it('루프백에만 바인딩된다', () => {
     expect(new URL(srv.origin).hostname).toBe('127.0.0.1');
   });

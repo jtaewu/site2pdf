@@ -2,6 +2,7 @@
 // 모든 통신은 루프백 안에서만 일어난다. 테스트 호스트명은 가짜 DNS로만 해석한다.
 import fs from 'node:fs';
 import http from 'node:http';
+import dgram from 'node:dgram';
 import type net from 'node:net';
 import path from 'node:path';
 import { chromium } from 'playwright';
@@ -20,6 +21,9 @@ let site: http.Server;
 let sPort = 0;
 let fPort = 0;
 const hits: string[] = [];
+const udpHits: string[] = [];
+let udp: dgram.Socket;
+let uPort = 0;
 
 async function listen(s: http.Server) {
   await new Promise<void>((r) => s.listen(0, '127.0.0.1', r));
@@ -47,15 +51,56 @@ beforeAll(async () => {
     if (p === '/redirect-loopback') return res.writeHead(302, { location: `http://127.0.0.1:${sPort}/via-302` }).end();
     if (p === '/redirect-metadata') return res.writeHead(302, { location: `http://169.254.169.254:${sPort}/latest/meta-data` }).end();
     if (p === '/redirect-rebind') return res.writeHead(302, { location: `http://rebind.test:${sPort}/via-302-rebind` }).end();
+    if (p === '/webrtc.html') return res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }).end(`<h1>webrtc</h1><script>try { const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:127.0.0.1:${uPort}' }] }); pc.createDataChannel('x'); pc.createOffer().then((o) => pc.setLocalDescription(o)); window.__rtc = 'created'; } catch (e) { window.__rtc = 'blocked:' + e.name; }</script>`);
     res.writeHead(404).end();
   });
   fPort = await listen(site);
+  udp = dgram.createSocket('udp4');
+  udp.on('message', (_m, rinfo) => udpHits.push(`${rinfo.address}:${rinfo.port}`));
+  await new Promise<void>((r) => udp.bind(0, '127.0.0.1', r));
+  uPort = udp.address().port;
 });
 afterAll(async () => {
+  udp.close();
   sentinel.closeAllConnections();
   site.closeAllConnections();
   await new Promise<void>((r) => sentinel.close(() => r()));
   await new Promise<void>((r) => site.close(() => r()));
+});
+
+describe('WebRTC(UDP) 우회 차단 (보안 감사 #1)', () => {
+  it('대조군: 방어 없는 브라우저는 STUN으로 UDP sentinel에 직접 보낸다', async () => {
+    udpHits.length = 0;
+    const b = await chromium.launch();
+    try {
+      const p = await b.newPage();
+      await p.goto(`http://127.0.0.1:${fPort}/webrtc.html`);
+      await sleep(3000);
+      expect(await p.evaluate(() => (window as unknown as { __rtc: string }).__rtc)).toBe('created');
+    } finally {
+      await b.close();
+    }
+    expect(udpHits.length).toBeGreaterThan(0);
+  });
+
+  it('site2pdf 브라우저·컨텍스트: RTCPeerConnection 없음, UDP 도달 0건', async () => {
+    udpHits.length = 0;
+    const docsOrigin = `http://docs.test:${fPort}`;
+    const proxy = await startEgressProxy({ allowedHostPorts: [`docs.test:${fPort}`], privateExceptions: [`docs.test:${fPort}`], resolve: async () => ['127.0.0.1'] });
+    const browser = await launchBrowser({ proxyUrl: proxy.url });
+    try {
+      const { context } = await createSafeContext(browser, { pageOrigins: [docsOrigin] });
+      const page = await context.newPage();
+      await page.goto(`${docsOrigin}/webrtc.html`);
+      await sleep(3000);
+      expect(await page.evaluate(() => (window as unknown as { __rtc: string }).__rtc)).toMatch(/^blocked:/);
+      await context.close();
+    } finally {
+      await browser.close();
+      await proxy.close();
+    }
+    expect(udpHits).toEqual([]);
+  });
 });
 
 describe('네트워크 격리', () => {

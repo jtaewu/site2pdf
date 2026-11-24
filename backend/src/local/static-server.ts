@@ -30,23 +30,35 @@ export function resolveInsideRoot(realRoot: string, urlPath: string): { file: st
   }
   if (decoded.includes('\0')) return { status: 404 };
   if (decoded.endsWith('/')) decoded += 'index.html';
+  const isHidden = (p: string) => p.split(/[\\/]/).some((seg) => seg.startsWith('.') && seg !== '.' && seg !== '..');
   // 숨김 파일/폴더(.git, .env 등) 차단
-  if (decoded.split(/[\\/]/).some((seg) => seg.startsWith('.') && seg !== '.' && seg !== '..')) return { status: 404 };
-  const candidate = path.resolve(realRoot, `.${path.sep}${decoded}`);
+  if (isHidden(decoded)) return { status: 404 };
+  let root: string;
   let real: string;
   try {
-    real = fs.realpathSync(candidate);
+    // native realpath: Windows 8.3 짧은 이름(GIT~1)을 실제 이름으로 바꿔 숨김 검사 우회를 막는다 (보안 감사 #3)
+    root = fs.realpathSync.native(realRoot);
+    real = fs.realpathSync.native(path.resolve(root, `.${path.sep}${decoded}`));
   } catch {
     return { status: 404 };
   }
-  if (real !== realRoot && !real.startsWith(realRoot + path.sep)) return { status: 403 };
+  const caseFold = (s: string) => (process.platform === 'win32' ? s.toLowerCase() : s);
+  if (caseFold(real) !== caseFold(root) && !caseFold(real).startsWith(caseFold(root + path.sep))) return { status: 403 };
+  // 실제 경로 기준으로 숨김 검사를 다시 한다
+  if (isHidden(path.relative(root, real))) return { status: 404 };
   if (!fs.statSync(real).isFile()) return { status: 404 };
   return { file: real };
 }
 
 export async function startStaticServer(root: string, opts: StaticServerOptions = {}): Promise<StaticServer> {
-  const realRoot = fs.realpathSync(root);
+  const realRoot = fs.realpathSync.native(root);
+  let expectedHost = '';
   const server = http.createServer((req, res) => {
+    // Host 검사: 다른 브라우저가 DNS 재바인딩으로 이 임시 서버를 읽지 못하게 (보안 감사 #7)
+    if (req.headers.host !== expectedHost) {
+      res.writeHead(421, { 'content-type': 'text/plain' }).end('misdirected request');
+      return;
+    }
     if (req.method !== 'GET' && req.method !== 'HEAD') {
       res.writeHead(405).end();
       return;
@@ -67,6 +79,7 @@ export async function startStaticServer(root: string, opts: StaticServerOptions 
   });
   await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
   const { port } = server.address() as net.AddressInfo;
+  expectedHost = `127.0.0.1:${port}`;
   return {
     origin: `http://127.0.0.1:${port}`,
     root: realRoot,

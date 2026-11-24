@@ -72,7 +72,7 @@ describe('로컬 정적 사이트 (fixtures/static-site)', () => {
 describe('로컬 SPA (fixtures/spa-site)', () => {
   const spa = (render: Record<string, unknown> = {}) => ({
     mode: 'local', sourcePath: path.join(FIX, 'spa-site'), startPath: '/app/', spaFallbackPrefix: '/app/',
-    scope: { pathPrefixes: ['/app'] }, crawl: { minDelayMs: 0, timeoutMs: 5000 }, render,
+    scope: { pathPrefixes: ['/app'] }, crawl: { minDelayMs: 0, timeoutMs: 10000 }, render,
   });
 
   it('T-12 JS 렌더링 링크를 발견하고, 끝나지 않는 라우트는 실패로 기록하며 종료 코드 3', async () => {

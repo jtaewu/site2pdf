@@ -144,6 +144,8 @@ describe('SPA generate (T-12)', () => {
     const c = await inspect(path.join(out, m.combined.file));
     expect(c.pages.map((p) => p.text).join('')).toContain('동적렌더링확인');
     expect(m.message).toContain('탐색 단계에 실패');
+    // SC-12: 일부 실패한 결과는 validate도 성공으로 보지 않는다(3)
+    expect(await main(['validate', '--manifest', path.join(out, 'manifest.json')])).toBe(3);
   }, 120_000);
 });
 
@@ -171,4 +173,66 @@ describe('검수된 목록으로 generate (--discovered, SC-03/SC-04)', () => {
     const changed = writeCfg(out, { ...staticCfg, crawl: { minDelayMs: 0, maxPages: 3 } }, 'changed.json');
     expect(await main(['generate', '-c', changed, '-o', out, '--discovered', discovered])).toBe(2);
   }, 180_000);
+});
+
+describe('Phase 3: 그룹별 PDF·validate·출력 경로 보호 (FR-11, SC-05, T-18, SC-12)', () => {
+  let out: string;
+  beforeAll(async () => {
+    out = tmp();
+    const cfg = writeCfg(out, {
+      ...staticCfg,
+      pdf: { groups: [{ name: '가이드', pathPrefixes: ['/docs/guide'] }, { name: 'API', title: 'API 문서', pathPrefixes: ['/docs/api'] }, { name: '빈 그룹', pathPrefixes: ['/docs/none'] }] },
+    });
+    expect(await main(['generate', '-c', cfg, '-o', out])).toBe(0);
+  }, 180_000);
+
+  it('SC-05 그룹별 PDF는 해당 경로 페이지만 순서대로 담고, 빈 그룹은 만들지 않는다', async () => {
+    const m = readJson(path.join(out, 'manifest.json'));
+    expect(m.groups.map((g: { name: string; file: string | null; pages: string[] }) => [g.name, g.file, g.pages])).toEqual([
+      ['가이드', 'pdf/groups/01-가이드.pdf', ['/docs/guide/intro.html', '/docs/guide/install.html', '/docs/guide/media.html']],
+      ['API', 'pdf/groups/02-API.pdf', ['/docs/api/overview.html', '/docs/api/reference.html']],
+      ['빈 그룹', null, []],
+    ]);
+    const api = await inspect(path.join(out, 'pdf/groups/02-API.pdf'));
+    expect(api.outline.map((o) => o.title)).toEqual(['API 개요', 'API 레퍼런스']);
+    const sum = m.pages.filter((p: { path: string }) => p.path.startsWith('/docs/api/')).reduce((n: number, p: { pdfPages: number }) => n + p.pdfPages, 0);
+    expect(api.pages.length).toBe(sum);
+    // 그룹 밖 변환 대상 페이지 링크는 로컬 모드에서 제거(루프백 주소 노출 없음)
+    expect(api.pages.flatMap((p) => p.links.filter((l) => l.url?.startsWith('http://127.0.0.1')))).toEqual([]);
+  });
+
+  it('FR-15 민감정보 형태 문자열을 경고(값은 가림)하고 PDF는 바꾸지 않는다', () => {
+    const m = readJson(path.join(out, 'manifest.json'));
+    const overview = m.pages.find((p: { path: string }) => p.path === '/docs/api/overview.html');
+    expect(overview.sensitive).toEqual([{ type: 'bearer-token', count: 1, sample: 'Bearer***' }]);
+    expect(JSON.stringify(m)).not.toContain('FIXTURE_FAKE_TOKEN_DO_NOT_LOG');
+    expect(fs.readFileSync(path.join(out, 'report.md'), 'utf8')).toContain('민감정보로 보이는 문자열');
+  });
+
+  it('validate: 정상 결과는 통과(0)', async () => {
+    expect(await main(['validate', '--manifest', path.join(out, 'manifest.json')])).toBe(0);
+    const v = readJson(path.join(out, 'validation.json'));
+    expect(v.checks.filter((c: { status: string }) => c.status === 'fail')).toEqual([]);
+    expect(v.checks.map((c: { check: string }) => c.check)).toEqual(expect.arrayContaining(['combined:outline', 'combined:start-pages', 'page#1:text', 'group:API:pages']));
+  });
+
+  it('validate: 누락·손상·경로 이탈을 찾으면 실패(4)', async () => {
+    const copy = tmp();
+    fs.cpSync(out, copy, { recursive: true });
+    const m = readJson(path.join(copy, 'manifest.json'));
+    fs.rmSync(path.join(copy, m.pages[1].pdfFile));
+    fs.writeFileSync(path.join(copy, m.combined.file), 'not a pdf');
+    m.pages[2].pdfFile = '../../outside.pdf';
+    fs.writeFileSync(path.join(copy, 'manifest.json'), JSON.stringify(m));
+    expect(await main(['validate', '--manifest', path.join(copy, 'manifest.json')])).toBe(4);
+    const v = readJson(path.join(copy, 'validation.json'));
+    const failed = v.checks.filter((c: { status: string }) => c.status === 'fail').map((c: { check: string }) => c.check);
+    expect(failed).toEqual(expect.arrayContaining(['page#2:exists', 'combined:pdf', 'page#3:path']));
+  });
+
+  it('T-18 출력 폴더가 원본 사이트 폴더 안이면 거부(2)', async () => {
+    const cfg = writeCfg(tmp(), staticCfg);
+    expect(await main(['generate', '-c', cfg, '-o', path.join(FIX, 'static-site', 'out')])).toBe(2);
+    expect(fs.existsSync(path.join(FIX, 'static-site', 'out'))).toBe(false);
+  });
 });

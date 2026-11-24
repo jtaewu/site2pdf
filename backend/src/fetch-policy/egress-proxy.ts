@@ -20,6 +20,8 @@ export type EgressPolicy = {
   privateExceptions?: string[];
   resolve?: Resolver;
   connectTimeoutMs?: number;
+  /** DNS 해석 상한(ms), 기본 10초 */
+  dnsTimeoutMs?: number;
   /** 테스트 전용: `host:port` → 실제 연결할 포트 (루프백 fixture가 임의 포트에서 열리므로) */
   portMap?: Record<string, number>;
 };
@@ -38,6 +40,8 @@ export type EgressProxy = {
   close(): Promise<void>;
 };
 
+const DNS_TIMEOUT_MS = 10_000;
+
 const key = (host: string, port: number) => `${stripBrackets(host).toLowerCase().replace(/\.+$/, '')}:${port}`;
 
 export async function startEgressProxy(policy: EgressPolicy): Promise<EgressProxy> {
@@ -47,13 +51,30 @@ export async function startEgressProxy(policy: EgressPolicy): Promise<EgressProx
   const timeout = policy.connectTimeoutMs ?? 15_000;
   const decisions: EgressDecision[] = [];
 
-  async function decide(host: string, port: number): Promise<{ ok: true; address: string } | { ok: false; reason: string; address?: string }> {
+  type Decision = { ok: true; address: string } | { ok: false; reason: string; address?: string };
+
+  /** 예외가 나도 거부로 끝나게 감싼다 (보안 감사 #5: 처리 안 된 예외로 프로세스가 죽지 않게) */
+  async function decide(host: string, port: number): Promise<Decision> {
+    try {
+      return await decideUnsafe(host, port);
+    } catch {
+      return { ok: false, reason: 'policy-error' };
+    }
+  }
+
+  async function decideUnsafe(host: string, port: number): Promise<Decision> {
     const hp = key(host, port);
     if (!allowed.has(hp)) return { ok: false, reason: 'host-not-allowed' };
     const bare = stripBrackets(host);
     let addresses: string[];
     try {
-      addresses = net.isIP(bare) ? [bare] : await resolve(bare);
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      addresses = net.isIP(bare)
+        ? [bare]
+        : await Promise.race([
+            resolve(bare),
+            new Promise<never>((_, rej) => (timer = setTimeout(() => rej(new Error('dns-timeout')), policy.dnsTimeoutMs ?? DNS_TIMEOUT_MS))),
+          ]).finally(() => clearTimeout(timer));
     } catch {
       return { ok: false, reason: 'dns-failure' };
     }

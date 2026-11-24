@@ -35,6 +35,15 @@ export async function createSafeContext(browser: Browser, opts: SafeContextOptio
     ignoreHTTPSErrors: opts.ignoreHTTPSErrors ?? false,
   });
 
+  // WebRTC는 route·프록시를 우회해 UDP로 임의 주소에 닿을 수 있다(STUN/TURN) → 페이지에서 API를 없앤다 (보안 감사 #1)
+  await context.addInitScript(() => {
+    for (const name of ['RTCPeerConnection', 'webkitRTCPeerConnection', 'RTCDataChannel', 'RTCIceCandidate', 'RTCSessionDescription']) {
+      try {
+        Object.defineProperty(globalThis, name, { value: undefined, configurable: false, writable: false });
+      } catch {}
+    }
+  });
+
   await context.route('**/*', (route) => {
     const req = route.request();
     const url = req.url();

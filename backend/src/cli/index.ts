@@ -6,6 +6,7 @@ import { ExitCode, Site2pdfError } from '../errors.ts';
 import { runAudit } from '../audit/command.ts';
 import { runDiscover } from '../discover/command.ts';
 import { runGenerate } from '../generate/command.ts';
+import { runValidate } from '../validate/command.ts';
 import { createLogger } from '../report/logger.ts';
 import { maskText } from '../report/mask.ts';
 import { TOOL } from '../report/summary.ts';
@@ -16,11 +17,13 @@ const HELP = `site2pdf ${TOOL.version}
   site2pdf audit    (--url <https URL> | --source <폴더>) [--config <파일>] [--output <폴더>]
   site2pdf discover (--url <https URL> | --source <폴더>) [--config <파일>] [--output <폴더>]
   site2pdf generate (--url <https URL> | --source <폴더>) [--config <파일>] [--output <폴더>] [--discovered <파일>]
+  site2pdf validate --manifest <output/manifest.json>
 
 권장 흐름: discover → output/discovered.json 검수 → generate --discovered output/discovered.json
 
 옵션:
   --discovered <파일>     generate: 검수한 discover 결과로 변환(같은 설정이어야 함). 없으면 탐색부터 다시 함
+  --manifest <파일>       validate: generate 결과(manifest.json)와 PDF 파일 일치·손상·누락 검증
   --url <URL>             원격 HTTPS 사이트 (소유 또는 명시적 수집 권한이 있는 사이트만)
   --source <폴더>         로컬 정적 사이트 빌드 폴더 (외부 네트워크 사용 안 함)
   -c, --config <파일>     설정 JSON (config/examples 참고)
@@ -29,7 +32,7 @@ const HELP = `site2pdf ${TOOL.version}
   -v, --verbose           상세 로그
   -h, --help              도움말
 
-종료 코드: 0 성공, 2 입력·설정·권한 문제, 3 탐색·변환 실패(일부 실패 포함), 4 보안 정책 위반
+종료 코드: 0 성공, 2 입력·설정·권한 문제, 3 탐색·변환 실패(일부 실패 포함), 4 보안 정책 위반·출력 검증 실패
 `;
 
 export async function main(argv: string[]): Promise<number> {
@@ -45,6 +48,7 @@ export async function main(argv: string[]): Promise<number> {
         output: { type: 'string', short: 'o', default: 'output' },
         'browser-channel': { type: 'string' },
         discovered: { type: 'string' },
+        manifest: { type: 'string' },
         verbose: { type: 'boolean', short: 'v', default: false },
         help: { type: 'boolean', short: 'h', default: false },
       },
@@ -58,6 +62,26 @@ export async function main(argv: string[]): Promise<number> {
   if (values.help || !command) {
     process.stdout.write(HELP);
     return values.help ? ExitCode.OK : ExitCode.INPUT;
+  }
+  if (command === 'validate') {
+    const log = createLogger({ verbose: values.verbose });
+    if (!values.manifest) {
+      log.warn('validate 에는 --manifest <파일> 이 필요합니다.');
+      return ExitCode.INPUT;
+    }
+    try {
+      const r = await runValidate(values.manifest);
+      for (const c of r.checks.filter((x) => x.status !== 'ok')) (c.status === 'fail' ? log.warn : log.info)(`[${c.status}] ${c.check}: ${c.detail}`);
+      (r.exitCode === ExitCode.OK ? log.info : log.warn)(r.summary);
+      log.info(`결과: ${r.file} (종료 코드 ${r.exitCode})`);
+      return r.exitCode;
+    } catch (e) {
+      if (e instanceof Site2pdfError) {
+        log.warn(`${e.code}: ${e.message}`);
+        return e.exitCode;
+      }
+      throw e;
+    }
   }
   if (command !== 'audit' && command !== 'discover' && command !== 'generate') {
     process.stderr.write(`알 수 없는 명령: ${command}\n\n${HELP}`);

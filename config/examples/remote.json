@@ -44,6 +44,15 @@
     "pagewise": true,
     "combined": true,
     "title": "예시 개발자 문서",
-    "fileName": "example-docs"
+    "fileName": "example-docs",
+    "groups": [
+      {
+        "name": "API",
+        "title": "예시 API 문서",
+        "pathPrefixes": [
+          "/docs/api"
+        ]
+      }
+    ]
   }
 }

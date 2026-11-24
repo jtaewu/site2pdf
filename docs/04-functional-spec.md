@@ -6,6 +6,7 @@
 | 0.2 | 2026-11-24 | Phase 1 구현에 맞춰 구조·CLI·설정·discovered.json·종료 코드 확정 (D-03, D-06, D-08, D-09, D-11, D-14 반영) |
 | 0.3 | 2026-11-24 | Phase 2: `generate`, `--discovered`, `pdf.*`·`selection.order` 설정, manifest.json·report.md, PDF 링크·북마크 규칙 (D-07, D-10, D-15 반영) |
 | 0.4 | 2026-11-24 | 일시적 실패 재시도(`crawl.retries`), audit 렌더 설정 후보, iframe 펼침 경고, 실행기(`site2pdf.cmd`) |
+| 0.5 | 2026-11-24 | Phase 3: `validate`, 그룹별 PDF, 민감정보 경고(FR-15), 출력 경로 보호(T-18), 종료 코드 정리 |
 
 ## 1. 구조
 ```text
@@ -39,7 +40,7 @@ npm run cli -- audit    --url https://example.com/docs [--config ./site.json] [-
 npm run cli -- discover --url https://example.com/docs [--config ./site.json] [--output ./output]
 npm run cli -- discover --source ./dist-site [--config ./local.json] [--output ./output]
 npm run cli -- generate --source ./dist-site [--config ./local.json] [--output ./output] [--discovered ./output/discovered.json]
-# Phase 3 예정
+# 결과 검증 (Phase 3): 파일 존재·손상·쪽수·북마크 순서·경로 이탈·텍스트 검색 가능·민감정보 → validation.json
 site2pdf validate --manifest ./output/manifest.json
 ```
 - 권장 흐름: `discover` → `discovered.json` 검수(필요하면 `selection` 설정 수정 후 다시 discover) → `generate --discovered`.
@@ -90,7 +91,9 @@ site2pdf validate --manifest ./output/manifest.json
     "combined": true,                     // 통합 PDF (FR-07)
     "title": "제품 개발자 문서",           // (시작 페이지 제목) 통합 PDF 제목 메타데이터 (FR-13)
     "fileName": "site-combined",          // 통합 PDF 파일명(확장자 제외, 정제됨)
-    "groups": []                          // 그룹별 PDF(FR-11)는 Phase 3. 현재 빈 배열만 허용
+    "groups": [                           // 그룹별 PDF (FR-11): pdf/groups/NN-이름.pdf
+      { "name": "API", "title": "API 문서", "pathPrefixes": ["/docs/api"] }
+    ]
   }
 }
 ```
@@ -139,3 +142,16 @@ site2pdf validate --manifest ./output/manifest.json
 | `2` | 입력·설정·권한 확인 실패 | 잘못된 URL·설정, robots 금지·확인 실패, 401/403/429, `--discovered` 설정 불일치 |
 | `3` | 탐색·렌더링·변환 실패 | 일부 페이지 실패(통합 PDF는 성공 페이지만으로 만들되 실패로 표시), 시작 페이지 실패, 변환 대상 0개, 브라우저 실행 실패 |
 | `4` | 보안 정책 위반 | 시작 호스트가 비공개 주소로 해석, 시작 페이지가 범위 밖이나 이그레스 차단 목적지(내부 IP 등)로 리다이렉트 |
+
+## 7. Phase 3 추가 사항
+### validate
+`site2pdf validate --manifest <out/manifest.json>` — 브라우저·네트워크를 쓰지 않는다. 결과는 같은 폴더의 `validation.json`(`checks[]`: `check`, `status` ok|warn|fail, `detail`).
+- fail(종료 코드 4): PDF 없음·손상, 쪽수 불일치, 통합 PDF 쪽수 합·장 시작 쪽·장 북마크 순서 불일치, 텍스트 없는 페이지 PDF, manifest 경로가 출력 폴더 밖·절대 경로
+- warn: manifest에 없는 페이지 PDF 잔존, 빈 그룹, 민감정보 형태 문자열, 변환 실패 페이지
+- 종료 코드: fail 있으면 4, 실패 페이지가 있거나 generate가 0이 아니었으면 3, 그 외 0
+### 그룹별 PDF (FR-11)
+`pdf.groups[]`: `name`, `title`(없으면 "통합 제목 - 이름"), `pathPrefixes`(세그먼트 경계). 변환된 페이지 중 해당 경로만 통합 PDF와 같은 규칙(북마크·내부 링크)으로 묶는다. 그룹 밖 변환 대상 페이지 링크는 원격이면 웹 주소 유지, 로컬이면 제거. 해당 페이지가 없는 그룹은 만들지 않고 경고. manifest `groups[]`: `name`, `title`, `file`, `pages`, `pdfPages`.
+### 민감정보 경고 (FR-15)
+각 페이지 본문에서 개인 키 헤더, AWS 키, GitHub·Slack 토큰, JWT, Bearer/Basic 값, `api_key=`·`password=` 형태 대입을 찾는다. PDF는 바꾸지 않고 manifest `pages[].sensitive`(종류·건수·앞 6자 표본)와 report.md에 경고한다.
+### 출력 경로 보호 (T-18)
+출력 폴더가 파일이거나(로컬 모드) 원본 사이트 폴더 안이면 종료 코드 2. 모든 결과 파일은 출력 폴더 기준 상대 경로로만 쓰며 밖으로 나가면 종료 코드 4.

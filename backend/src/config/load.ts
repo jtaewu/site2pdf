@@ -1,3 +1,4 @@
+import { maskUrl } from '../report/mask.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -47,7 +48,7 @@ export function loadConfig(input: CliInput): { config: Config; configHash: strin
 
   if (config.mode === 'remote') {
     const check = validateRemoteUrl(config.startUrl);
-    if (!check.ok) throw fail('start-url-rejected', `시작 URL 거부(${check.reason}): ${config.startUrl}`);
+    if (!check.ok) throw fail('start-url-rejected', `시작 URL 거부(${check.reason}): ${maskUrl(config.startUrl)}`);
     config.startUrl = check.url;
     const startOrigin = normalizeOrigin(check.url);
     const origins = config.scope.allowedOrigins.map(safeOrigin);
@@ -58,7 +59,7 @@ export function loadConfig(input: CliInput): { config: Config; configHash: strin
     config.scope.allowedOrigins = [startOrigin];
     config.resources.allowedOrigins = config.resources.allowedOrigins.map((o) => {
       const v = validateRemoteUrl(o);
-      if (!v.ok) throw fail('resource-origin-rejected', `resources.allowedOrigins 거부(${v.reason}): ${o}`);
+      if (!v.ok) throw fail('resource-origin-rejected', `resources.allowedOrigins 거부(${v.reason}): ${maskUrl(o)}`);
       return normalizeOrigin(v.url);
     });
     if (config.crawl.minDelayMs < REMOTE_MIN_DELAY_MS) {
@@ -87,8 +88,49 @@ function safeOrigin(o: string): string {
   try {
     return normalizeOrigin(o);
   } catch {
-    throw fail('origin-invalid', `잘못된 origin: ${o}`);
+    throw fail('origin-invalid', `잘못된 origin: ${maskUrl(o)}`);
   }
+}
+
+/** 비교용 실제 경로 (없는 경로는 존재하는 상위까지 실제 경로로 바꾼 뒤 나머지를 붙인다, Windows는 대소문자 무시) */
+function realish(p: string): string {
+  let cur = path.resolve(p);
+  const rest: string[] = [];
+  while (!fs.existsSync(cur)) {
+    const parent = path.dirname(cur);
+    if (parent === cur) break;
+    rest.unshift(path.basename(cur));
+    cur = parent;
+  }
+  const real = path.join(fs.realpathSync.native(cur), ...rest);
+  return process.platform === 'win32' ? real.toLowerCase() : real;
+}
+
+/**
+ * 출력 폴더 검증 (T-18): 파일이면 안 되고, 로컬 모드에서 원본 사이트 폴더 안이면 안 된다
+ * (결과물이 다음 탐색 대상이 되거나 원본을 덮어쓸 수 있음).
+ */
+export function assertSafeOutputDir(config: Config, outputDir: string): void {
+  if (fs.existsSync(outputDir) && !fs.statSync(outputDir).isDirectory()) {
+    throw fail('output-not-directory', `출력 경로가 폴더가 아닙니다: ${outputDir}`);
+  }
+  if (config.mode === 'local') {
+    const out = realish(outputDir);
+    const src = realish(config.sourcePath);
+    if (out === src || out.startsWith(src + path.sep)) {
+      throw fail('output-inside-source', `출력 폴더가 원본 사이트 폴더 안에 있습니다. 다른 위치를 지정하세요: ${outputDir}`);
+    }
+  }
+}
+
+/** outputDir 아래 상대 경로를 안전하게 붙인다. 바깥으로 나가면 예외 (T-18) */
+export function safeJoin(outputDir: string, rel: string): string {
+  const base = path.resolve(outputDir);
+  const full = path.resolve(base, rel);
+  if (path.isAbsolute(rel) || (full !== base && !full.startsWith(base + path.sep))) {
+    throw new Site2pdfError(ExitCode.SECURITY, 'output-path-escape', `출력 폴더 밖 경로로 쓰려고 했습니다: ${rel}`);
+  }
+  return full;
 }
 
 export function stableStringify(v: unknown): string {

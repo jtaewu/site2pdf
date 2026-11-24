@@ -4,6 +4,7 @@ import type { PdfConfig, RenderConfig } from '../config/schema.ts';
 import { openPage, type LoadResult } from '../browser/page-loader.ts';
 import { preparePrint } from './print.ts';
 import { extractPdfText, textCoverage } from '../pdf/pdf-text.ts';
+import { scanSensitive, type SensitiveHit } from '../report/sensitive.ts';
 
 /** 텍스트 커버리지가 이보다 낮으면 잘림·누락 경고 */
 export const COVERAGE_WARN = 0.99;
@@ -16,11 +17,13 @@ export type RenderedPage = {
   h1: string | null;
   warnings: string[];
   qa?: { coverage: number; missingSamples: string[]; overflow: Array<{ tag: string; right: number }>; tightTables: number };
+  /** 본문에서 찾은 민감정보 형태 문자열 (값은 가림, FR-15) */
+  sensitive: SensitiveHit[];
 };
 
 export async function renderPage(context: BrowserContext, url: string, render: RenderConfig, pdf: PdfConfig, timeoutMs: number): Promise<RenderedPage> {
   const { page, result } = await openPage(context, url, render, timeoutMs);
-  const out: RenderedPage = { load: result, h1: null, warnings: [] };
+  const out: RenderedPage = { load: result, h1: null, warnings: [], sensitive: [] };
   try {
     if (result.failure) {
       out.failure = result.failure;
@@ -48,6 +51,8 @@ export async function renderPage(context: BrowserContext, url: string, render: R
     out.pdf = bytes;
     out.pdfPages = text.pages;
     out.qa = { coverage: cov.ratio, missingSamples: cov.missing, overflow: prep.overflow, tightTables: prep.tightTables };
+    out.sensitive = scanSensitive(prep.bodyText);
+    for (const s of out.sensitive) out.warnings.push(`sensitive-content:${s.type}x${s.count}`);
     for (const [tag, n] of Object.entries(prep.unsupported)) out.warnings.push(`unsupported-content:${tag}x${n}`);
     if (prep.iframeExpanded) out.warnings.push(`iframe-expanded:${prep.iframeExpanded}`);
     if (prep.overflow.length) out.warnings.push(`horizontal-overflow:${prep.overflow.map((o) => o.tag).join(',')}`);

@@ -7,7 +7,8 @@ const V4_BLOCKED: Array<[string, number]> = [
   ['198.18.0.0', 15], ['198.51.100.0', 24], ['203.0.113.0', 24], ['224.0.0.0', 4], ['240.0.0.0', 4],
 ];
 const V6_BLOCKED: Array<[string, number]> = [
-  ['::', 128], ['::1', 128], ['64:ff9b::', 96], ['64:ff9b:1::', 48], ['100::', 64],
+  // ::/96 IPv4-compatible(예 ::7f00:1), ::ffff:0:0:0/96 SIIT (보안 감사 #4)
+  ['::', 96], ['::ffff:0:0:0', 96], ['::', 128], ['::1', 128], ['64:ff9b::', 96], ['64:ff9b:1::', 48], ['100::', 64],
   ['2001::', 23], ['2001:db8::', 32], ['2002::', 16], ['fc00::', 7], ['fe80::', 10], ['fec0::', 10], ['ff00::', 8],
 ];
 
@@ -43,7 +44,14 @@ export function nonPublicIpReason(ip: string): string | null {
   const family = net.isIP(addr);
   if (family === 0) return 'not-an-ip';
   if (family === 6) {
-    const v4 = embeddedV4(addr);
+    // 존 ID(fe80::1%eth0)는 링크로컬 전용 표기 → 비공개로 본다. 해석 불가 표기도 안전하게 차단 (보안 감사 #5)
+    if (addr.includes('%')) return 'zone-id-address';
+    let v4: string | null;
+    try {
+      v4 = embeddedV4(addr);
+    } catch {
+      return 'unparsable-ipv6';
+    }
     if (v4) return nonPublicIpReason(v4) ? 'ipv4-mapped-non-public' : null;
     return blockList.check(addr, 'ipv6') ? 'non-public-address' : null;
   }

@@ -113,6 +113,19 @@ describe('이그레스 프록시', () => {
     });
   });
 
+  it('감사 #5: 존 ID 주소·응답 없는 DNS도 프로세스를 죽이지 않고 거부한다', async () => {
+    await withProxy({ allowedHostPorts: [`docs.test:${tPort}`], resolve: async () => ['fe80::1%eth0'] }, async (p) => {
+      expect(await viaProxy(p, `http://docs.test:${tPort}/`)).toMatchObject({ status: 403 });
+    });
+    await withProxy({ allowedHostPorts: [`docs.test:${tPort}`], resolve: () => new Promise(() => {}), dnsTimeoutMs: 300 }, async (p) => {
+      expect(await viaProxy(p, `http://docs.test:${tPort}/`)).toEqual({ status: 403, blocked: 'dns-failure' });
+    });
+    await withProxy({ allowedHostPorts: ['docs.test:443'], resolve: async () => ['::7f00:1'] }, async (p) => {
+      expect(await connect(p, 'docs.test:443')).toBe(403);
+    });
+    expect(hits).toEqual([]);
+  });
+
   it('DNS 실패는 거부로 처리한다', async () => {
     await withProxy({ allowedHostPorts: [`docs.test:${tPort}`], resolve: async () => { throw new Error('ENOTFOUND'); } }, async (p) => {
       expect(await viaProxy(p, `http://docs.test:${tPort}/`)).toEqual({ status: 403, blocked: 'dns-failure' });

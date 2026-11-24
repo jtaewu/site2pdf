@@ -1,5 +1,6 @@
 // audit 명령: 수집 전에 입력·권한 신호·구조·외부 의존성을 최소 요청으로 진단한다 (SC-01, 01-source-audit)
 // 요청: robots.txt(원격), 시작 페이지, sitemap.xml 각 1회
+import { assertSafeOutputDir } from '../config/load.ts';
 import type { Config } from '../config/schema.ts';
 import { ExitCode, type ExitCodeValue } from '../errors.ts';
 import { openSession, type SessionOptions } from '../session.ts';
@@ -13,6 +14,7 @@ export type AuditOutput = { file: string; exitCode: ExitCodeValue; findings: str
 export async function runAudit(config: Config, configHash: string, outputDir: string, opts: SessionOptions = {}): Promise<AuditOutput> {
   const runId = newRunId();
   const createdAt = new Date().toISOString();
+  assertSafeOutputDir(config, outputDir);
   const session = await openSession(config, opts);
   try {
     const findings: string[] = [];

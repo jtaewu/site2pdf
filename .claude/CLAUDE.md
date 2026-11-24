@@ -17,7 +17,7 @@
 | 경로 | 내용 |
 |---|---|
 | `backend/` | 변환 엔진 + CLI (Node 24, TypeScript, Playwright Chromium) |
-| `backend/src/` | `cli`, `config`, `fetch-policy`(URL·IP·이그레스 프록시), `local`, `browser`, `discover`, `audit`, `render`(인쇄 준비), `pdf`(링크·북마크·병합), `generate`, `report` |
+| `backend/src/` | `cli`, `config`, `fetch-policy`(URL·IP·이그레스 프록시), `local`, `browser`, `discover`, `audit`, `render`(인쇄 준비), `pdf`(링크·북마크·병합), `generate`, `validate`, `report` |
 | `backend/tests/` | `unit`(네트워크 없음), `integration`(루프백 소켓), `e2e`(브라우저) |
 | `frontend/` | 예약 폴더. GUI는 MVP 범위 밖 |
 | `config/examples/` | 설정 예시 |
@@ -51,4 +51,5 @@
 | 단계별 구현 계획 | `docs/08-implementation-plan.md` |
 | 미결 사항·결정 기록 | `docs/09-open-questions.md` |
 | ADR | `docs/adr/ADR-001~004` |
+| 사용·운영 가이드 | `docs/10-user-guide.md` |
 | Phase 0 진단 보고서 | `output/audit-report.md` |

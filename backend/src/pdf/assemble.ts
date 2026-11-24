@@ -9,11 +9,13 @@ export type LinkPolicy = {
   siteOrigin: string;
   /** 로컬 모드면 페이지별 PDF 안의 사이트 링크(루프백 주소)를 남기지 않는다 */
   local: boolean;
+  /** 이 문서에는 없지만 변환 대상인 페이지(그룹별 PDF에서 다른 그룹 페이지). 원격이면 웹 주소로 유지 */
+  knownPages?: Set<string>;
 };
 
 export type PagePart = { url: string; chapterTitle: string; bytes: Uint8Array };
 
-type LinkClass = { type: 'included'; url: string; fragment: string | null } | { type: 'site-excluded' } | { type: 'external' };
+type LinkClass = { type: 'included'; url: string; fragment: string | null } | { type: 'site-known' } | { type: 'site-excluded' } | { type: 'external' };
 
 function classify(uri: string, included: Set<string>, policy: LinkPolicy): LinkClass {
   let u: URL;
@@ -26,6 +28,7 @@ function classify(uri: string, included: Set<string>, policy: LinkPolicy): LinkC
   const n = policy.normalize(uri);
   const fragment = u.hash ? safeDecode(u.hash.slice(1)) : null;
   if (n && included.has(n)) return { type: 'included', url: n, fragment };
+  if (n && policy.knownPages?.has(n)) return { type: 'site-known' };
   return { type: 'site-excluded' };
 }
 
@@ -93,6 +96,7 @@ export async function buildCombined(parts: PagePart[], policy: LinkPolicy, meta:
 
   let anchorExact = 0;
   let brokenNamed = 0;
+  const includedKeys = new Set(included.keys());
   const stats = rewriteLinks(out, pages, (t: LinkTarget, pageIndex): LinkAction => {
     if (t.kind === 'named') {
       const s = srcs[partOfPage(pageIndex)]!;
@@ -103,8 +107,9 @@ export async function buildCombined(parts: PagePart[], policy: LinkPolicy, meta:
       }
       return goto(s, d);
     }
-    const c = classify(t.uri, new Set(included.keys()), policy);
+    const c = classify(t.uri, includedKeys, policy);
     if (c.type === 'external') return { action: 'keep' };
+    if (c.type === 'site-known') return policy.local ? { action: 'remove' } : { action: 'keep' };
     if (c.type === 'site-excluded') return { action: 'remove' };
     const s = srcs[included.get(c.url)!]!;
     const d = c.fragment ? s.dests.get(c.fragment) : undefined;

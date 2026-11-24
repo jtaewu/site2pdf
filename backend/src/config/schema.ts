@@ -70,8 +70,19 @@ export const pdfSchema = z
     title: z.string().min(1).max(200).optional(),
     /** 통합 PDF 파일 이름(확장자 제외, FR-13) */
     fileName: z.string().min(1).max(80).default('site-combined'),
-    /** 그룹별 PDF (FR-11): Phase 3 예정. 현재는 빈 배열만 허용 */
-    groups: z.array(z.unknown()).max(0, 'pdf.groups(그룹별 PDF)는 Phase 3에서 지원합니다').default([]),
+    /** 그룹별 PDF (FR-11, SC-05): 경로 prefix(세그먼트 경계)에 해당하는 페이지만 모은 추가 PDF */
+    groups: z
+      .array(
+        z
+          .object({
+            name: z.string().min(1).max(60),
+            title: z.string().min(1).max(200).optional(),
+            pathPrefixes: z.array(z.string().startsWith('/')).min(1),
+          })
+          .strict(),
+      )
+      .max(50)
+      .default([]),
   })
   .strict();
 

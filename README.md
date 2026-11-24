@@ -2,7 +2,7 @@
 
 승인된 웹사이트 URL 또는 로컬 정적 사이트를 **안전하게 탐색**해 PDF로 내보내는 CLI입니다. 특정 문서 플랫폼에 종속되지 않습니다.
 
-> 현재 단계: **Phase 2 (PDF 생성)** 완료 — `audit`, `discover`, `generate` 명령을 쓸 수 있습니다. 검증 명령·그룹별 PDF는 Phase 3 예정입니다.
+> 현재 단계: **Phase 3 완료 (MVP 기능 완성)** — `audit`, `discover`, `generate`, `validate` 명령을 쓸 수 있습니다. 남은 단계는 실제 사이트(KICC) 적용(Phase 4)입니다. 자세한 사용·운영 방법은 [docs/10-user-guide.md](docs/10-user-guide.md)를 보세요.
 
 ## 설치 (처음 한 번)
 
@@ -30,6 +30,9 @@ site2pdf.cmd discover --source D:/문서사이트/build -o output
 # 3) PDF 생성: 검수한 목록으로 변환
 site2pdf.cmd generate --source D:/문서사이트/build -o output --discovered output/discovered.json
 
+# 4) 결과 검증: 파일 누락·손상·순서·경로 이탈·민감정보 (output/validation.json)
+site2pdf.cmd validate --manifest output/manifest.json
+
 # 원격 사이트 (소유 또는 명시적 수집 권한이 있는 HTTPS 사이트만)
 site2pdf.cmd generate --url https://docs.example.com/docs/ -o output
 ```
@@ -39,6 +42,7 @@ site2pdf.cmd generate --url https://docs.example.com/docs/ -o output
 결과:
 - `output/pdf/<파일명>.pdf`: 통합 PDF (장별 북마크, 다른 페이지 링크는 PDF 안에서 해당 위치로 이동)
 - `output/pdf/pages/NNN-제목.pdf`: 페이지별 PDF
+- `output/pdf/groups/NN-이름.pdf`: 그룹별 PDF (설정 `pdf.groups`)
 - `output/report.md`, `output/manifest.json`: 페이지별 결과·경고와 **육안 검수 체크리스트**
 - `output/discovered.json`, `output/audit.json`: 탐색·진단 결과
 

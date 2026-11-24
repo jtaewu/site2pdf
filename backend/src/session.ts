@@ -113,6 +113,15 @@ export async function openSession(config: Config, opts: SessionOptions = {}): Pr
       }
     };
 
+    // 시스템 브라우저(조직 정책 적용 가능)는 프록시 설정이 무시될 수 있다 → 실제로 프록시를 거치는지 먼저 확인 (보안 감사 #6)
+    if (opts.channel) {
+      const before = egress.decisions.length;
+      await fetchText(`${scope.allowedOrigins[0]!}/robots.txt`);
+      if (egress.decisions.length === before) {
+        throw new Site2pdfError(ExitCode.SECURITY, 'proxy-bypassed', `시스템 브라우저(${opts.channel})가 이그레스 프록시를 거치지 않습니다(조직 정책 가능성). 전용 Chromium을 쓰세요: npm run browser:install`);
+      }
+    }
+
     let robots: RobotsPolicy = { state: 'not-applicable' };
     if (config.mode === 'remote' && config.crawl.respectRobotsTxt) robots = await loadRobots(scope.allowedOrigins[0]!, fetchText);
 

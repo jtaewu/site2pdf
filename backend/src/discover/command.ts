@@ -1,4 +1,5 @@
 // discover 명령: 범위 안 페이지 목록을 만들고 discovered.json에 기록한다 (SC-02, SC-03, FR-03~05, FR-09 일부)
+import { assertSafeOutputDir } from '../config/load.ts';
 import type { Config } from '../config/schema.ts';
 import { ExitCode, type ExitCodeValue } from '../errors.ts';
 import { openSession, type Session, type SessionOptions } from '../session.ts';
@@ -107,6 +108,7 @@ export type DiscoverOutput = { file: string; exitCode: ExitCodeValue; result: Cr
 export async function runDiscover(config: Config, configHash: string, outputDir: string, opts: SessionOptions = {}): Promise<DiscoverOutput> {
   const runId = newRunId();
   const createdAt = new Date().toISOString();
+  assertSafeOutputDir(config, outputDir);
   const session = await openSession(config, opts);
   try {
     const outcome = await discoverInSession(session, config, opts.log);

@@ -42,3 +42,29 @@
 
 ## 4. 완료 조건
 Must 기능 테스트 통과 + 서로 다른 구조의 샘플 사이트 2종 이상 + 보안 테스트 필수 항목 통과 + 수동 PDF QA. Should 실패는 별도 한계로 명시.
+
+## 5. 실행 결과 (Phase 3 완료, 2026-11-24)
+`cd backend && npm test` → **226건 통과** (단위·통합·브라우저 E2E). 파일은 `backend/tests/`.
+
+| ID | 결과 | 검증 위치 | 비고 |
+|---|---|---|---|
+| T-01 | 통과 | `e2e/remote-https.test.ts`, `unit/url-policy.test.ts` | 실제 외부 사이트 대신 루프백 HTTPS fixture + 가짜 DNS (승인된 테스트 URL 없음) |
+| T-02 | 통과 | `unit/url-policy.test.ts`, `unit/config-robots-mask.test.ts` | |
+| T-03 | 통과 | `unit/url-policy.test.ts`, `unit/phase3-security.test.ts`, `integration/egress-proxy.test.ts`, `integration/session-remote.test.ts` | IPv4-compatible·SIIT·존 ID 포함 |
+| T-04 | 통과 | `e2e/network-isolation.test.ts`, `e2e/remote-https.test.ts`, `integration/egress-proxy.test.ts` | 리다이렉트 이탈은 프록시가 차단, 종료 코드 4 |
+| T-05 | 통과 | `integration/egress-proxy.test.ts`, `e2e/network-isolation.test.ts` | 가짜 DNS 시뮬레이션 |
+| T-06 | 통과 | `unit/url-policy.test.ts`, `unit/crawler.test.ts`, `e2e/discover-local.test.ts` | |
+| T-07 | 통과 | `unit/crawler.test.ts` | |
+| T-08 | 통과 | `unit/crawler.test.ts`, `unit/config-robots-mask.test.ts`, `e2e/remote-https.test.ts` | 캡차 자동 판별은 미지원(정상 응답 캡차는 탐지 못함) |
+| T-09 | 통과 | `unit/crawler.test.ts` | 가짜 시계로 간격·상한 확인 |
+| T-10 | 통과 | `unit/crawler.test.ts`, `unit/generate-plan.test.ts`, `e2e/discover-local.test.ts`, `e2e/generate.test.ts` | |
+| T-11 | 통과 | `e2e/generate.test.ts` | |
+| T-12 | 통과 | `e2e/discover-local.test.ts`, `e2e/generate.test.ts` | |
+| T-13 | 통과 + 육안 검수 | `e2e/generate.test.ts` | 대표 PDF(정적·SPA·미디어) 육안 검수 완료 |
+| T-14 | 통과 | `e2e/generate.test.ts` | 같은 사이트 iframe은 펼쳐 인쇄, video·canvas 경고 |
+| T-15 | 통과 | `e2e/generate.test.ts` (+ `validate`) | |
+| T-16 | 통과 | `integration/static-server.test.ts` | 심볼릭 링크는 권한 문제로 junction·8.3 짧은 이름으로 대체 시험 |
+| T-17 | 통과 | `e2e/discover-local.test.ts`, `e2e/network-isolation.test.ts` | WebRTC(UDP) 우회 차단 포함 |
+| T-18 | 통과 | `unit/generate-plan.test.ts`, `unit/phase3-security.test.ts`, `e2e/generate.test.ts` | 파일명 정제, 출력 폴더 보호, manifest 경로 이탈 검증 |
+| T-19 | 통과 | `e2e/generate.test.ts`, `unit/crawler.test.ts` | 부분 실패는 종료 코드 3, validate도 3 |
+| T-20 | 통과 | `unit/config-robots-mask.test.ts`, `unit/phase3-security.test.ts` | 대소문자·임의 스킴·fragment·CLI 출력 |

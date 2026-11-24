@@ -35,3 +35,18 @@
 - 원격 모드에서 프록시가 실제 공인 DNS를 쓰는 부분은 PoC 범위 밖(가짜 DNS만 사용)이다. Phase 1에서 `dns.lookup(all)` 후 모든 주소 검사, IPv6, 타임아웃을 구현·시험한다.
 - Chrome 백그라운드 트래픽 완화 플래그(`--disable-background-networking` 등)는 적용하되, 의존하지 말고 L-C로 강제한다.
 - 렌더링 중 최상위 문서가 범위 밖으로 이동하면(PoC에서 `chrome-error://` 페이지로 끝남) **해당 페이지를 실패로 기록**한다. 에러 화면을 PDF로 만들지 않는다.
+
+## Phase 3 독립 보안 감사 결과와 조치 (2026-11-24)
+보안 감사 에이전트가 코드를 읽고 검토했다(동적 공격은 하지 않음). 7건 모두 조치하고 회귀 테스트를 추가했다.
+
+| # | 등급 | 발견 | 조치 |
+|---|---|---|---|
+| 1 | High | **WebRTC(UDP)는 HTTP 프록시와 route를 모두 우회**: STUN으로 사설·메타데이터 주소에 UDP 전송, 로컬 모드 "외부 요청 0" 위반 가능 | `--force-webrtc-ip-handling-policy=disable_non_proxied_udp` + 컨텍스트 init script로 `RTCPeerConnection` 등 제거. 대조군(방어 없음)은 UDP 도달, site2pdf는 0건 확인 (`e2e/network-isolation.test.ts`) |
+| 2 | Medium | 로그 마스킹이 대소문자 구분·http(s)만 처리 → `HTTPS://user:pw@…`, `ftp://`, fragment 토큰 노출 | 임의 스킴·대소문자 무시, 파싱 실패 시 `//…@` 통째로 가림, fragment 파라미터 마스킹, 설정 오류 메시지에도 적용 |
+| 3 | Low~Med | Windows 8.3 짧은 이름(`ENV~1`, `GIT~1`)으로 숨김 파일 차단 우회 | `realpathSync.native`로 정규화 후 실제 경로 기준으로 숨김 검사 재적용 (이 PC는 8.3 활성 상태에서 시험) |
+| 4 | Low | `::/96`(IPv4-compatible), `::ffff:0:0:0/96`(SIIT) 미차단 | 차단 목록 추가 |
+| 5 | Low | 존 ID 주소(`fe80::1%eth0`) 처리 중 예외 → 프록시 프로세스 종료, DNS 타임아웃 없음 | 판정 전체를 예외 시 거부로 감싸고 존 ID는 비공개로 판정, DNS 10초 상한 |
+| 6 | Low | 시스템 브라우저(`--browser-channel`)에서 조직 정책이 프록시 설정을 덮어쓸 가능성 | 시스템 브라우저일 때 시작 전에 실제로 프록시를 거치는지 확인, 아니면 보안 오류(4)로 중지 |
+| 7 | Low | 로컬 정적 서버가 Host 헤더를 검사하지 않음(다른 브라우저의 DNS 재바인딩) | `Host: 127.0.0.1:<port>`만 허용, 그 외 421 |
+
+남은 운영 권고: L-D(컨테이너·방화벽으로 프록시 외 egress 차단)는 코드가 아닌 실행 환경 설정이므로 `docs/10-user-guide.md` §5에 운영 지침으로 둔다.

@@ -1,4 +1,5 @@
 // generate 명령: 선택된 페이지를 렌더링해 페이지별 PDF와 통합 PDF, manifest.json, report.md를 만든다 (SC-04, FR-06~10, FR-13)
+import { assertSafeOutputDir, safeJoin } from '../config/load.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Config } from '../config/schema.ts';
@@ -10,7 +11,8 @@ import { renderPage } from '../render/render-page.ts';
 import { isTransientFailure } from '../discover/retry.ts';
 import { buildCombined, finalizePagePdf, type LinkPolicy, type PagePart } from '../pdf/assemble.ts';
 import { pageFileName, slugify } from '../pdf/filename.ts';
-import { normalizeUrl, scopeExclusionReason } from '../fetch-policy/url.ts';
+import { matchesPathPrefix, normalizeUrl, scopeExclusionReason } from '../fetch-policy/url.ts';
+import type { SensitiveHit } from '../report/sensitive.ts';
 import { realClock, type Clock } from '../discover/crawler.ts';
 import { TOOL, newRunId, robotsSummary, summarizeBlocked, summarizeEgressDenied, writeJson } from '../report/summary.ts';
 import { silentLogger } from '../report/logger.ts';
@@ -32,8 +34,12 @@ export type ManifestPage = {
   warnings: string[];
   qa: { coverage: number; overflow: Array<{ tag: string; right: number }>; tightTables: number; missingSamples: string[] } | null;
   blocked: string[];
+  /** 민감정보 형태 문자열 (값은 가림, FR-15) */
+  sensitive: SensitiveHit[];
   elapsedMs: number;
 };
+
+export type ManifestGroup = { name: string; title: string; file: string | null; pages: string[]; pdfPages: number };
 
 export type GenerateOutput = { manifestFile: string; reportFile: string; exitCode: ExitCodeValue; message: string; pages: ManifestPage[]; combinedFile: string | null };
 
@@ -49,6 +55,7 @@ export async function runGenerate(config: Config, configHash: string, outputDir:
   const runId = newRunId();
   const createdAt = new Date().toISOString();
   const discovered = opts.discoveredPath ? readDiscovered(opts.discoveredPath, configHash, config.mode) : null;
+  assertSafeOutputDir(config, outputDir);
   const session = await openSession(config, opts);
   try {
     const origin = session.scope.allowedOrigins[0]!;
@@ -56,6 +63,7 @@ export async function runGenerate(config: Config, configHash: string, outputDir:
     let plan: Plan;
     let exitCode: ExitCodeValue = ExitCode.OK;
     const notes: string[] = [];
+    const groupsOut: ManifestGroup[] = [];
 
     if (discovered) {
       const robots = session.robots;
@@ -125,7 +133,7 @@ export async function runGenerate(config: Config, configHash: string, outputDir:
         order, url: planned.url, path: planned.path, title, titleSource: source,
         status: failure ? 'failed' : 'rendered', failure, pdfFile: null, pdfPages: 0, combinedStartPage: null,
         warnings: [...r.warnings, ...(blocked.length ? [`blocked-requests:${blocked.length}`] : [])],
-        qa: r.qa ?? null, blocked, elapsedMs: r.load.elapsedMs,
+        qa: r.qa ?? null, blocked, sensitive: r.sensitive, elapsedMs: r.load.elapsedMs,
       };
       if (failure || !r.pdf) {
         log.warn(`실패 ${planned.path}: ${failure}`);
@@ -136,7 +144,7 @@ export async function runGenerate(config: Config, configHash: string, outputDir:
       if (config.pdf.pagewise) {
         const fin = await finalizePagePdf(r.pdf, includedSet, policy);
         const name = pageFileName(order, title);
-        fs.writeFileSync(path.join(pagesDir, name), fin.bytes);
+        fs.writeFileSync(safeJoin(outputDir, `pdf/pages/${name}`), fin.bytes);
         mp.pdfFile = `pdf/pages/${name}`;
       }
       parts.push({ url: planned.url, chapterTitle: title, bytes: r.pdf, index: manifestPages.length });
@@ -151,18 +159,42 @@ export async function runGenerate(config: Config, configHash: string, outputDir:
     // ---- 통합 PDF ----
     let combined: Awaited<ReturnType<typeof buildCombined>> | null = null;
     let combinedFile: string | null = null;
+    const docTitle = config.pdf.title ?? manifestPages.find((p) => p.status === 'rendered')?.title ?? 'site2pdf';
+    const meta = (title: string) => ({
+      title,
+      subject: config.mode === 'remote' ? config.startUrl : `local: ${path.basename(config.sourcePath)}`,
+      creator: `${TOOL.name} ${TOOL.version}`,
+      lang: 'ko',
+    });
     if (config.pdf.combined && parts.length) {
-      const docTitle = config.pdf.title ?? manifestPages.find((p) => p.status === 'rendered')?.title ?? 'site2pdf';
-      combined = await buildCombined(parts, policy, {
-        title: docTitle,
-        subject: config.mode === 'remote' ? config.startUrl : `local: ${path.basename(config.sourcePath)}`,
-        creator: `${TOOL.name} ${TOOL.version}`,
-        lang: 'ko',
-      });
+      combined = await buildCombined(parts, policy, meta(docTitle));
       combinedFile = `pdf/${slugify(config.pdf.fileName)}.pdf`;
-      fs.writeFileSync(path.join(outputDir, combinedFile), combined.bytes);
+      fs.writeFileSync(safeJoin(outputDir, combinedFile), combined.bytes);
       parts.forEach((p, k) => (manifestPages[p.index]!.combinedStartPage = combined!.partStartPages[k]!));
     }
+
+    // ---- 그룹별 PDF (FR-11, SC-05) ----
+    const groupsDir = path.join(outputDir, 'pdf', 'groups');
+    if (fs.existsSync(groupsDir)) for (const f of fs.readdirSync(groupsDir)) if (/^\d{2}-.*\.pdf$/i.test(f)) fs.rmSync(path.join(groupsDir, f));
+    for (const [gi, g] of config.pdf.groups.entries()) {
+      const title = g.title ?? `${docTitle} - ${g.name}`;
+      const gParts = parts.filter((p) => g.pathPrefixes.some((pre) => matchesPathPrefix(new URL(p.url).pathname, pre)));
+      if (!gParts.length) {
+        groupsOut.push({ name: g.name, title, file: null, pages: [], pdfPages: 0 });
+        notes.push(`그룹 '${g.name}'에 해당하는 페이지가 없어 만들지 않았습니다.`);
+        continue;
+      }
+      // 다른 그룹의 변환 대상 페이지 링크는 원격이면 웹 주소로 유지, 로컬이면 제거
+      const res = await buildCombined(gParts, { ...policy, knownPages: includedSet }, meta(title));
+      const file = `pdf/groups/${String(gi + 1).padStart(2, '0')}-${slugify(g.name)}.pdf`;
+      fs.mkdirSync(groupsDir, { recursive: true });
+      fs.writeFileSync(safeJoin(outputDir, file), res.bytes);
+      groupsOut.push({ name: g.name, title, file, pages: gParts.map((p) => manifestPages[p.index]!.path), pdfPages: res.pages });
+    }
+
+    // 민감정보 형태 문자열 경고 요약 (FR-15)
+    const sensitivePages = manifestPages.filter((p) => p.sensitive.length).length;
+    if (sensitivePages) notes.push(`민감정보로 보이는 문자열이 ${sensitivePages}개 페이지에 있습니다. 외부 배포 전 검수하세요(report.md).`);
 
     const failed = manifestPages.filter((p) => p.status === 'failed');
     let message: string;
@@ -198,6 +230,7 @@ export async function runGenerate(config: Config, configHash: string, outputDir:
           warnings: pages.reduce((n, x) => n + x.warnings.length, 0),
         },
         combined: comb && { file: comb.file, pages: comb.pages, outlineEntries: comb.outlineEntries, links: comb.links },
+        groups: groupsOut,
         pages,
         skipped: p?.skipped ?? [],
         blockedRequests: summarizeBlocked(session.blocked),
@@ -220,5 +253,5 @@ function chapterTitle(h1: string | null, docTitle: string, p: string): { title: 
 }
 
 function emptyPage(order: number, url: string, p: string, title: string, failure: string): ManifestPage {
-  return { order, url, path: p, title: title || p, titleSource: 'title', status: 'failed', failure, pdfFile: null, pdfPages: 0, combinedStartPage: null, warnings: [], qa: null, blocked: [], elapsedMs: 0 };
+  return { order, url, path: p, title: title || p, titleSource: 'title', status: 'failed', failure, pdfFile: null, pdfPages: 0, combinedStartPage: null, warnings: [], qa: null, blocked: [], sensitive: [], elapsedMs: 0 };
 }
