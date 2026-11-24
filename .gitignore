@@ -150,3 +150,7 @@ vite.config.ts.timestamp-*
 
 # Playwright MCP 출력(스냅샷·콘솔 로그)
 .playwright-mcp/
+
+# site2pdf 산출물 (Phase 0 진단 보고서만 추적)
+output/*
+!output/audit-report.md

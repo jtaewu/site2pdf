@@ -1,0 +1,6 @@
+body { margin: 0; font-family: "Malgun Gothic", sans-serif; }
+header.site { position: fixed; top: 0; left: 0; right: 0; height: 48px; background: #1f3a60; color: #fff; padding: 12px; }
+nav.side { position: fixed; top: 72px; left: 0; width: 220px; }
+main { margin: 72px 0 0 240px; padding: 16px; max-width: 900px; }
+pre { background: #f4f4f4; padding: 8px; overflow-x: auto; white-space: pre; }
+table { border-collapse: collapse; } td, th { border: 1px solid #999; padding: 4px 8px; white-space: nowrap; }

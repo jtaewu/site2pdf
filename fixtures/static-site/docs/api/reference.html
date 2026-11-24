@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><title>API 레퍼런스 | Fixture Docs</title>
+<link rel="stylesheet" href="/assets/site.css"></head>
+<body>
+<header class="site">Fixture Docs <a href="/logout" style="color:#fff">로그아웃</a></header>
+<nav class="side"><ul>
+  <li><a href="/docs/index.html">홈</a></li>
+  <li>가이드<ul>
+    <li><a href="/docs/guide/intro.html">시작하기</a></li>
+    <li><a href="/docs/guide/install.html#windows">설치</a></li>
+  </ul></li>
+  <li>API<ul>
+    <li><a href="/docs/api/overview.html">API 개요</a></li>
+    <li><a href="/docs/api/reference.html">API 레퍼런스</a></li>
+  </ul></li>
+</ul></nav>
+<main>
+<h1>API 레퍼런스</h1><h2 id="example">예제 코드 (90줄)</h2><pre><code>async function main() {
+  const line1 = await client.request({ method: "POST", path: "/v1/payments/1", body: { amount: 1, currency: "KRW", memo: "한글 메모 1" } });
+  const line2 = await client.request({ method: "POST", path: "/v1/payments/2", body: { amount: 2, currency: "KRW", memo: "한글 메모 2" } });
+  const line3 = await client.request({ method: "POST", path: "/v1/payments/3", body: { amount: 3, currency: "KRW", memo: "한글 메모 3" } });
+  const line4 = await client.request({ method: "POST", path: "/v1/payments/4", body: { amount: 4, currency: "KRW", memo: "한글 메모 4" } });
+  const line5 = await client.request({ method: "POST", path: "/v1/payments/5", body: { amount: 5, currency: "KRW", memo: "한글 메모 5" } });
+  const line6 = await client.request({ method: "POST", path: "/v1/payments/6", body: { amount: 6, currency: "KRW", memo: "한글 메모 6" } });
+  const line7 = await client.request({ method: "POST", path: "/v1/payments/7", body: { amount: 7, currency: "KRW", memo: "한글 메모 7" } });
+  const line8 = await client.request({ method: "POST", path: "/v1/payments/8", body: { amount: 8, currency: "KRW", memo: "한글 메모 8" } });
+  const line9 = await client.request({ method: "POST", path: "/v1/payments/9", body: { amount: 9, currency: "KRW", memo: "한글 메모 9" } });
+  const line10 = await client.request({ method: "POST", path: "/v1/payments/10", body: { amount: 10, currency: "KRW", memo: "한글 메모 10" } });
+  const line11 = await client.request({ method: "POST", path: "/v1/payments/11", body: { amount: 11, currency: "KRW", memo: "한글 메모 11" } });
+  const line12 = await client.request({ method: "POST", path: "/v1/payments/12", body: { amount: 12, currency: "KRW", memo: "한글 메모 12" } });
+  const line13 = await client.request({ method: "POST", path: "/v1/payments/13", body: { amount: 13, currency: "KRW", memo: "한글 메모 13" } });
+  const line14 = await client.request({ method: "POST", path: "/v1/payments/14", body: { amount: 14, currency: "KRW", memo: "한글 메모 14" } });
+  const line15 = await client.request({ method: "POST", path: "/v1/payments/15", body: { amount: 15, currency: "KRW", memo: "한글 메모 15" } });
+  const line16 = await client.request({ method: "POST", path: "/v1/payments/16", body: { amount: 16, currency: "KRW", memo: "한글 메모 16" } });
+  const line17 = await client.request({ method: "POST", path: "/v1/payments/17", body: { amount: 17, currency: "KRW", memo: "한글 메모 17" } });
+  const line18 = await client.request({ method: "POST", path: "/v1/payments/18", body: { amount: 18, currency: "KRW", memo: "한글 메모 18" } });
+  const line19 = await client.request({ method: "POST", path: "/v1/payments/19", body: { amount: 19, currency: "KRW", memo: "한글 메모 19" } });
+  const line20 = await client.request({ method: "POST", path: "/v1/payments/20", body: { amount: 20, currency: "KRW", memo: "한글 메모 20" } });
+  const line21 = await client.request({ method: "POST", path: "/v1/payments/21", body: { amount: 21, currency: "KRW", memo: "한글 메모 21" } });
+  const line22 = await client.request({ method: "POST", path: "/v1/payments/22", body: { amount: 22, currency: "KRW", memo: "한글 메모 22" } });
+  const line23 = await client.request({ method: "POST", path: "/v1/payments/23", body: { amount: 23, currency: "KRW", memo: "한글 메모 23" } });
+  const line24 = await client.request({ method: "POST", path: "/v1/payments/24", body: { amount: 24, currency: "KRW", memo: "한글 메모 24" } });
+  const line25 = await client.request({ method: "POST", path: "/v1/payments/25", body: { amount: 25, currency: "KRW", memo: "한글 메모 25" } });
+  const line26 = await client.request({ method: "POST", path: "/v1/payments/26", body: { amount: 26, currency: "KRW", memo: "한글 메모 26" } });
+  const line27 = await client.request({ method: "POST", path: "/v1/payments/27", body: { amount: 27, currency: "KRW", memo: "한글 메모 27" } });
+  const line28 = await client.request({ method: "POST", path: "/v1/payments/28", body: { amount: 28, currency: "KRW", memo: "한글 메모 28" } });
+  const line29 = await client.request({ method: "POST", path: "/v1/payments/29", body: { amount: 29, currency: "KRW", memo: "한글 메모 29" } });
+  const line30 = await client.request({ method: "POST", path: "/v1/payments/30", body: { amount: 30, currency: "KRW", memo: "한글 메모 30" } });
+  const line31 = await client.request({ method: "POST", path: "/v1/payments/31", body: { amount: 31, currency: "KRW", memo: "한글 메모 31" } });
+  const line32 = await client.request({ method: "POST", path: "/v1/payments/32", body: { amount: 32, currency: "KRW", memo: "한글 메모 32" } });
+  const line33 = await client.request({ method: "POST", path: "/v1/payments/33", body: { amount: 33, currency: "KRW", memo: "한글 메모 33" } });
+  const line34 = await client.request({ method: "POST", path: "/v1/payments/34", body: { amount: 34, currency: "KRW", memo: "한글 메모 34" } });
+  const line35 = await client.request({ method: "POST", path: "/v1/payments/35", body: { amount: 35, currency: "KRW", memo: "한글 메모 35" } });
+  const line36 = await client.request({ method: "POST", path: "/v1/payments/36", body: { amount: 36, currency: "KRW", memo: "한글 메모 36" } });
+  const line37 = await client.request({ method: "POST", path: "/v1/payments/37", body: { amount: 37, currency: "KRW", memo: "한글 메모 37" } });
+  const line38 = await client.request({ method: "POST", path: "/v1/payments/38", body: { amount: 38, currency: "KRW", memo: "한글 메모 38" } });
+  const line39 = await client.request({ method: "POST", path: "/v1/payments/39", body: { amount: 39, currency: "KRW", memo: "한글 메모 39" } });
+  const line40 = await client.request({ method: "POST", path: "/v1/payments/40", body: { amount: 40, currency: "KRW", memo: "한글 메모 40" } });
+  const line41 = await client.request({ method: "POST", path: "/v1/payments/41", body: { amount: 41, currency: "KRW", memo: "한글 메모 41" } });
+  const line42 = await client.request({ method: "POST", path: "/v1/payments/42", body: { amount: 42, currency: "KRW", memo: "한글 메모 42" } });
+  const line43 = await client.request({ method: "POST", path: "/v1/payments/43", body: { amount: 43, currency: "KRW", memo: "한글 메모 43" } });
+  const line44 = await client.request({ method: "POST", path: "/v1/payments/44", body: { amount: 44, currency: "KRW", memo: "한글 메모 44" } });
+  const line45 = await client.request({ method: "POST", path: "/v1/payments/45", body: { amount: 45, currency: "KRW", memo: "한글 메모 45" } });
+  const line46 = await client.request({ method: "POST", path: "/v1/payments/46", body: { amount: 46, currency: "KRW", memo: "한글 메모 46" } });
+  const line47 = await client.request({ method: "POST", path: "/v1/payments/47", body: { amount: 47, currency: "KRW", memo: "한글 메모 47" } });
+  const line48 = await client.request({ method: "POST", path: "/v1/payments/48", body: { amount: 48, currency: "KRW", memo: "한글 메모 48" } });
+  const line49 = await client.request({ method: "POST", path: "/v1/payments/49", body: { amount: 49, currency: "KRW", memo: "한글 메모 49" } });
+  const line50 = await client.request({ method: "POST", path: "/v1/payments/50", body: { amount: 50, currency: "KRW", memo: "한글 메모 50" } });
+  const line51 = await client.request({ method: "POST", path: "/v1/payments/51", body: { amount: 51, currency: "KRW", memo: "한글 메모 51" } });
+  const line52 = await client.request({ method: "POST", path: "/v1/payments/52", body: { amount: 52, currency: "KRW", memo: "한글 메모 52" } });
+  const line53 = await client.request({ method: "POST", path: "/v1/payments/53", body: { amount: 53, currency: "KRW", memo: "한글 메모 53" } });
+  const line54 = await client.request({ method: "POST", path: "/v1/payments/54", body: { amount: 54, currency: "KRW", memo: "한글 메모 54" } });
+  const line55 = await client.request({ method: "POST", path: "/v1/payments/55", body: { amount: 55, currency: "KRW", memo: "한글 메모 55" } });
+  const line56 = await client.request({ method: "POST", path: "/v1/payments/56", body: { amount: 56, currency: "KRW", memo: "한글 메모 56" } });
+  const line57 = await client.request({ method: "POST", path: "/v1/payments/57", body: { amount: 57, currency: "KRW", memo: "한글 메모 57" } });
+  const line58 = await client.request({ method: "POST", path: "/v1/payments/58", body: { amount: 58, currency: "KRW", memo: "한글 메모 58" } });
+  const line59 = await client.request({ method: "POST", path: "/v1/payments/59", body: { amount: 59, currency: "KRW", memo: "한글 메모 59" } });
+  const line60 = await client.request({ method: "POST", path: "/v1/payments/60", body: { amount: 60, currency: "KRW", memo: "한글 메모 60" } });
+  const line61 = await client.request({ method: "POST", path: "/v1/payments/61", body: { amount: 61, currency: "KRW", memo: "한글 메모 61" } });
+  const line62 = await client.request({ method: "POST", path: "/v1/payments/62", body: { amount: 62, currency: "KRW", memo: "한글 메모 62" } });
+  const line63 = await client.request({ method: "POST", path: "/v1/payments/63", body: { amount: 63, currency: "KRW", memo: "한글 메모 63" } });
+  const line64 = await client.request({ method: "POST", path: "/v1/payments/64", body: { amount: 64, currency: "KRW", memo: "한글 메모 64" } });
+  const line65 = await client.request({ method: "POST", path: "/v1/payments/65", body: { amount: 65, currency: "KRW", memo: "한글 메모 65" } });
+  const line66 = await client.request({ method: "POST", path: "/v1/payments/66", body: { amount: 66, currency: "KRW", memo: "한글 메모 66" } });
+  const line67 = await client.request({ method: "POST", path: "/v1/payments/67", body: { amount: 67, currency: "KRW", memo: "한글 메모 67" } });
+  const line68 = await client.request({ method: "POST", path: "/v1/payments/68", body: { amount: 68, currency: "KRW", memo: "한글 메모 68" } });
+  const line69 = await client.request({ method: "POST", path: "/v1/payments/69", body: { amount: 69, currency: "KRW", memo: "한글 메모 69" } });
+  const line70 = await client.request({ method: "POST", path: "/v1/payments/70", body: { amount: 70, currency: "KRW", memo: "한글 메모 70" } });
+  const line71 = await client.request({ method: "POST", path: "/v1/payments/71", body: { amount: 71, currency: "KRW", memo: "한글 메모 71" } });
+  const line72 = await client.request({ method: "POST", path: "/v1/payments/72", body: { amount: 72, currency: "KRW", memo: "한글 메모 72" } });
+  const line73 = await client.request({ method: "POST", path: "/v1/payments/73", body: { amount: 73, currency: "KRW", memo: "한글 메모 73" } });
+  const line74 = await client.request({ method: "POST", path: "/v1/payments/74", body: { amount: 74, currency: "KRW", memo: "한글 메모 74" } });
+  const line75 = await client.request({ method: "POST", path: "/v1/payments/75", body: { amount: 75, currency: "KRW", memo: "한글 메모 75" } });
+  const line76 = await client.request({ method: "POST", path: "/v1/payments/76", body: { amount: 76, currency: "KRW", memo: "한글 메모 76" } });
+  const line77 = await client.request({ method: "POST", path: "/v1/payments/77", body: { amount: 77, currency: "KRW", memo: "한글 메모 77" } });
+  const line78 = await client.request({ method: "POST", path: "/v1/payments/78", body: { amount: 78, currency: "KRW", memo: "한글 메모 78" } });
+  const line79 = await client.request({ method: "POST", path: "/v1/payments/79", body: { amount: 79, currency: "KRW", memo: "한글 메모 79" } });
+  const line80 = await client.request({ method: "POST", path: "/v1/payments/80", body: { amount: 80, currency: "KRW", memo: "한글 메모 80" } });
+  const line81 = await client.request({ method: "POST", path: "/v1/payments/81", body: { amount: 81, currency: "KRW", memo: "한글 메모 81" } });
+  const line82 = await client.request({ method: "POST", path: "/v1/payments/82", body: { amount: 82, currency: "KRW", memo: "한글 메모 82" } });
+  const line83 = await client.request({ method: "POST", path: "/v1/payments/83", body: { amount: 83, currency: "KRW", memo: "한글 메모 83" } });
+  const line84 = await client.request({ method: "POST", path: "/v1/payments/84", body: { amount: 84, currency: "KRW", memo: "한글 메모 84" } });
+  const line85 = await client.request({ method: "POST", path: "/v1/payments/85", body: { amount: 85, currency: "KRW", memo: "한글 메모 85" } });
+  const line86 = await client.request({ method: "POST", path: "/v1/payments/86", body: { amount: 86, currency: "KRW", memo: "한글 메모 86" } });
+  const line87 = await client.request({ method: "POST", path: "/v1/payments/87", body: { amount: 87, currency: "KRW", memo: "한글 메모 87" } });
+  const line88 = await client.request({ method: "POST", path: "/v1/payments/88", body: { amount: 88, currency: "KRW", memo: "한글 메모 88" } });
+  const line89 = await client.request({ method: "POST", path: "/v1/payments/89", body: { amount: 89, currency: "KRW", memo: "한글 메모 89" } });
+  const line90 = await client.request({ method: "POST", path: "/v1/payments/90", body: { amount: 90, currency: "KRW", memo: "한글 메모 90" } });
+}</code></pre><h2 id="errors">오류 코드 (넓은 표)</h2><table><thead><tr><th>코드</th><th>이름</th><th>설명</th><th>속성</th><th>문서 URL</th><th>갱신일</th></tr></thead><tbody><tr><td>E1</td><td>PAYMENT_ERROR_CODE_1</td><td>결제 승인 오류 설명 1: 카드사 응답 지연으로 인한 재시도 필요</td><td>retryable=true</td><td>https://docs.example.invalid/errors/E1</td><td>2026-11-24T00:00:00+09:00</td></tr>
+<tr><td>E2</td><td>PAYMENT_ERROR_CODE_2</td><td>결제 승인 오류 설명 2: 카드사 응답 지연으로 인한 재시도 필요</td><td>retryable=true</td><td>https://docs.example.invalid/errors/E2</td><td>2026-11-24T00:00:00+09:00</td></tr>
+<tr><td>E3</td><td>PAYMENT_ERROR_CODE_3</td><td>결제 승인 오류 설명 3: 카드사 응답 지연으로 인한 재시도 필요</td><td>retryable=true</td><td>https://docs.example.invalid/errors/E3</td><td>2026-11-24T00:00:00+09:00</td></tr>
+<tr><td>E4</td><td>PAYMENT_ERROR_CODE_4</td><td>결제 승인 오류 설명 4: 카드사 응답 지연으로 인한 재시도 필요</td><td>retryable=true</td><td>https://docs.example.invalid/errors/E4</td><td>2026-11-24T00:00:00+09:00</td></tr>
+<tr><td>E5</td><td>PAYMENT_ERROR_CODE_5</td><td>결제 승인 오류 설명 5: 카드사 응답 지연으로 인한 재시도 필요</td><td>retryable=true</td><td>https://docs.example.invalid/errors/E5</td><td>2026-11-24T00:00:00+09:00</td></tr>
+<tr><td>E6</td><td>PAYMENT_ERROR_CODE_6</td><td>결제 승인 오류 설명 6: 카드사 응답 지연으로 인한 재시도 필요</td><td>retryable=true</td><td>https://docs.example.invalid/errors/E6</td><td>2026-11-24T00:00:00+09:00</td></tr>
+<tr><td>E7</td><td>PAYMENT_ERROR_CODE_7</td><td>결제 승인 오류 설명 7: 카드사 응답 지연으로 인한 재시도 필요</td><td>retryable=true</td><td>https://docs.example.invalid/errors/E7</td><td>2026-11-24T00:00:00+09:00</td></tr>
+<tr><td>E8</td><td>PAYMENT_ERROR_CODE_8</td><td>결제 승인 오류 설명 8: 카드사 응답 지연으로 인한 재시도 필요</td><td>retryable=true</td><td>https://docs.example.invalid/errors/E8</td><td>2026-11-24T00:00:00+09:00</td></tr>
+<tr><td>E9</td><td>PAYMENT_ERROR_CODE_9</td><td>결제 승인 오류 설명 9: 카드사 응답 지연으로 인한 재시도 필요</td><td>retryable=true</td><td>https://docs.example.invalid/errors/E9</td><td>2026-11-24T00:00:00+09:00</td></tr>
+<tr><td>E10</td><td>PAYMENT_ERROR_CODE_10</td><td>결제 승인 오류 설명 10: 카드사 응답 지연으로 인한 재시도 필요</td><td>retryable=true</td><td>https://docs.example.invalid/errors/E10</td><td>2026-11-24T00:00:00+09:00</td></tr>
+<tr><td>E11</td><td>PAYMENT_ERROR_CODE_11</td><td>결제 승인 오류 설명 11: 카드사 응답 지연으로 인한 재시도 필요</td><td>retryable=true</td><td>https://docs.example.invalid/errors/E11</td><td>2026-11-24T00:00:00+09:00</td></tr>
+<tr><td>E12</td><td>PAYMENT_ERROR_CODE_12</td><td>결제 승인 오류 설명 12: 카드사 응답 지연으로 인한 재시도 필요</td><td>retryable=true</td><td>https://docs.example.invalid/errors/E12</td><td>2026-11-24T00:00:00+09:00</td></tr>
+<tr><td>E13</td><td>PAYMENT_ERROR_CODE_13</td><td>결제 승인 오류 설명 13: 카드사 응답 지연으로 인한 재시도 필요</td><td>retryable=true</td><td>https://docs.example.invalid/errors/E13</td><td>2026-11-24T00:00:00+09:00</td></tr>
+<tr><td>E14</td><td>PAYMENT_ERROR_CODE_14</td><td>결제 승인 오류 설명 14: 카드사 응답 지연으로 인한 재시도 필요</td><td>retryable=true</td><td>https://docs.example.invalid/errors/E14</td><td>2026-11-24T00:00:00+09:00</td></tr>
+<tr><td>E15</td><td>PAYMENT_ERROR_CODE_15</td><td>결제 승인 오류 설명 15: 카드사 응답 지연으로 인한 재시도 필요</td><td>retryable=true</td><td>https://docs.example.invalid/errors/E15</td><td>2026-11-24T00:00:00+09:00</td></tr>
+<tr><td>E16</td><td>PAYMENT_ERROR_CODE_16</td><td>결제 승인 오류 설명 16: 카드사 응답 지연으로 인한 재시도 필요</td><td>retryable=true</td><td>https://docs.example.invalid/errors/E16</td><td>2026-11-24T00:00:00+09:00</td></tr>
+<tr><td>E17</td><td>PAYMENT_ERROR_CODE_17</td><td>결제 승인 오류 설명 17: 카드사 응답 지연으로 인한 재시도 필요</td><td>retryable=true</td><td>https://docs.example.invalid/errors/E17</td><td>2026-11-24T00:00:00+09:00</td></tr>
+<tr><td>E18</td><td>PAYMENT_ERROR_CODE_18</td><td>결제 승인 오류 설명 18: 카드사 응답 지연으로 인한 재시도 필요</td><td>retryable=true</td><td>https://docs.example.invalid/errors/E18</td><td>2026-11-24T00:00:00+09:00</td></tr>
+<tr><td>E19</td><td>PAYMENT_ERROR_CODE_19</td><td>결제 승인 오류 설명 19: 카드사 응답 지연으로 인한 재시도 필요</td><td>retryable=true</td><td>https://docs.example.invalid/errors/E19</td><td>2026-11-24T00:00:00+09:00</td></tr>
+<tr><td>E20</td><td>PAYMENT_ERROR_CODE_20</td><td>결제 승인 오류 설명 20: 카드사 응답 지연으로 인한 재시도 필요</td><td>retryable=true</td><td>https://docs.example.invalid/errors/E20</td><td>2026-11-24T00:00:00+09:00</td></tr>
+<tr><td>E21</td><td>PAYMENT_ERROR_CODE_21</td><td>결제 승인 오류 설명 21: 카드사 응답 지연으로 인한 재시도 필요</td><td>retryable=true</td><td>https://docs.example.invalid/errors/E21</td><td>2026-11-24T00:00:00+09:00</td></tr>
+<tr><td>E22</td><td>PAYMENT_ERROR_CODE_22</td><td>결제 승인 오류 설명 22: 카드사 응답 지연으로 인한 재시도 필요</td><td>retryable=true</td><td>https://docs.example.invalid/errors/E22</td><td>2026-11-24T00:00:00+09:00</td></tr>
+<tr><td>E23</td><td>PAYMENT_ERROR_CODE_23</td><td>결제 승인 오류 설명 23: 카드사 응답 지연으로 인한 재시도 필요</td><td>retryable=true</td><td>https://docs.example.invalid/errors/E23</td><td>2026-11-24T00:00:00+09:00</td></tr>
+<tr><td>E24</td><td>PAYMENT_ERROR_CODE_24</td><td>결제 승인 오류 설명 24: 카드사 응답 지연으로 인한 재시도 필요</td><td>retryable=true</td><td>https://docs.example.invalid/errors/E24</td><td>2026-11-24T00:00:00+09:00</td></tr>
+<tr><td>E25</td><td>PAYMENT_ERROR_CODE_25</td><td>결제 승인 오류 설명 25: 카드사 응답 지연으로 인한 재시도 필요</td><td>retryable=true</td><td>https://docs.example.invalid/errors/E25</td><td>2026-11-24T00:00:00+09:00</td></tr></tbody></table>
+</main></body></html>

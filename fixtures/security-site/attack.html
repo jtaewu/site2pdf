@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><title>Security Fixture</title>
+<link rel="prefetch" href="__SENTINEL__/prefetch">
+<link rel="stylesheet" href="__SENTINEL__/css">
+<style>body{background:url("__SENTINEL__/css-bg")} @font-face{font-family:x;src:url("__SENTINEL__/font")} p{font-family:x}</style>
+</head><body>
+<h1>보안 fixture: 범위 밖 요청 시도</h1>
+<p>이 페이지는 허용 origin 밖(sentinel 서버)으로 여러 방식의 요청을 시도한다.</p>
+<img src="__SENTINEL__/img">
+<iframe src="__SENTINEL__/iframe"></iframe>
+<video src="__SENTINEL__/video"></video>
+<form id="f" action="__SENTINEL__/form" method="post"><input name="a" value="1"></form>
+<script>
+const S = '__SENTINEL__';
+const log = (k, v) => (window.__attempts = window.__attempts || []).push(k + ':' + v);
+fetch(S + '/fetch').then(() => log('fetch', 'ok'), e => log('fetch', 'blocked'));
+try { navigator.sendBeacon(S + '/beacon', 'x'); log('beacon', 'sent'); } catch (e) { log('beacon', 'err'); }
+try { const es = new EventSource(S + '/sse'); es.onerror = () => { log('sse', 'err'); es.close(); }; } catch (e) { log('sse', 'throw'); }
+try { const ws = new WebSocket(S.replace('http', 'ws') + '/ws'); ws.onopen = () => log('ws', 'open'); ws.onerror = () => log('ws', 'err'); } catch (e) { log('ws', 'throw'); }
+const w = window.open(S + '/popup'); log('popup', w ? 'opened' : 'null');
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').then(() => log('sw', 'registered'), e => log('sw', 'rejected:' + e.name));
+} else { log('sw', 'unavailable'); }
+new Worker(URL.createObjectURL(new Blob([`fetch('${S}/worker').catch(()=>{})`]))); 
+// 최상위 이동 시도(리다이렉트 이탈)
+setTimeout(() => { log('nav', 'try'); location.href = S + '/top-nav'; }, 1500);
+</script>
+</body></html>
