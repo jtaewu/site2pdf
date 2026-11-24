@@ -93,9 +93,10 @@ describe('정적 사이트 generate (T-11, T-13, T-14, T-15)', () => {
     }
   });
 
-  it('T-14 iframe·동영상·캔버스는 경고, 차단 리소스는 기록', () => {
+  it('T-14 같은 사이트 iframe은 펼쳐 인쇄, 동영상·캔버스는 경고, 차단 리소스는 기록', () => {
     const media = m.pages.find((p: { path: string }) => p.path === '/docs/guide/media.html');
-    expect(media.warnings).toEqual(expect.arrayContaining(['unsupported-content:iframex1', 'unsupported-content:videox1', 'unsupported-content:canvasx1']));
+    expect(media.warnings).toEqual(expect.arrayContaining(['iframe-expanded:1', 'unsupported-content:videox1', 'unsupported-content:canvasx1']));
+    expect(media.warnings).not.toContain('unsupported-content:iframex1');
     const intro = m.pages.find((p: { path: string }) => p.path === '/docs/guide/intro.html');
     expect(intro.blocked).toContain('image https://example.invalid/logo.png');
   });
@@ -116,8 +117,8 @@ describe('정적 사이트 generate (T-11, T-13, T-14, T-15)', () => {
     expect(koreanAnchorPage).toBeGreaterThan(m.pages.find((p: { path: string }) => p.path === '/docs/guide/media.html').combinedStartPage - 1);
     expect(gotos).toContain(errorsPage);
     expect(gotos).toContain(koreanAnchorPage);
-    // #errors, #한글-앵커, 그리고 미디어 페이지 iframe(같은 사이트 페이지) 안 내비게이션의 설치#windows
-    expect(m.combined.links.anchorExact).toBe(3);
+    // 시작하기 본문의 #errors·#한글-앵커 2개 + 미디어 페이지에 펼쳐 인쇄된 iframe(시작하기 페이지) 본문의 같은 링크 2개
+    expect(m.combined.links.anchorExact).toBe(4);
     expect(m.combined.links.brokenNamed).toBe(0);
   });
 

@@ -36,7 +36,7 @@ export async function discoverInSession(session: Session, config: Config, log: L
     message = '접근 거부(401/403/407/429) 응답을 받아 우회하지 않고 중지했습니다. 승인된 접근 경로나 로컬 빌드를 확인하세요.';
   } else if (result.stopReason === 'start-failed') {
     const f = result.pages[0]?.failure ?? result.excluded[0]?.reason ?? 'unknown';
-    exitCode = f.startsWith('redirect-out-of-scope') ? ExitCode.SECURITY : ExitCode.RUN;
+    exitCode = /^(redirect-out-of-scope|egress-blocked)/.test(f) ? ExitCode.SECURITY : ExitCode.RUN;
     message = `시작 페이지 처리 실패: ${f}`;
   } else if (failed.length > 0) {
     exitCode = ExitCode.RUN;

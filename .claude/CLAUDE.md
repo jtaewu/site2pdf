@@ -33,6 +33,8 @@
 - `npm test`: 전체 테스트(브라우저 E2E 포함). Windows에서는 반드시 `npm test`로 실행(`scripts/vitest.mjs`가 드라이브 대소문자 문제를 피함)
 - `npm run cli -- discover --source ../fixtures/static-site -o ../output`
 - `npm run cli -- generate -c ../config/examples/local-static.json -o ../output` (결과 PDF는 Read 도구로 직접 열어 육안 검수)
+- 저장소 루트 실행기: `site2pdf.cmd` (Windows), `./site2pdf` (sh) → `backend/scripts/cli.mjs` (Node 24 확인 후 실행)
+- 원격 모드 테스트는 `tests/e2e/remote-https.test.ts` 처럼 `testOnly` 옵션(코드 전용)으로 루프백 HTTPS fixture를 쓴다. 실제 외부 사이트로 테스트하지 않는다
 
 ## 문서 목록
 

@@ -4,6 +4,8 @@ import type { Config } from '../config/schema.ts';
 import { ExitCode, type ExitCodeValue } from '../errors.ts';
 import { openSession, type SessionOptions } from '../session.ts';
 import { normalizeUrl, scopeExclusionReason } from '../fetch-policy/url.ts';
+import { openPage, type LoadResult } from '../browser/page-loader.ts';
+import { suggestRender, type RenderSuggestion } from './suggest.ts';
 import { TOOL, newRunId, robotsSummary, summarizeBlocked, summarizeEgressDenied, writeJson } from '../report/summary.ts';
 
 export type AuditOutput = { file: string; exitCode: ExitCodeValue; findings: string[] };
@@ -26,7 +28,18 @@ export async function runAudit(config: Config, configHash: string, outputDir: st
       findings.push('robots.txt가 시작 URL 수집을 금지함');
     }
 
-    const start = exitCode === ExitCode.OK ? await session.load(session.startUrl) : null;
+    let start: LoadResult | null = null;
+    let suggestion: RenderSuggestion | null = null;
+    if (exitCode === ExitCode.OK) {
+      const opened = await openPage(session.context, session.startUrl, config.render, config.crawl.timeoutMs);
+      start = opened.result;
+      // 렌더가 성공했거나 본문 길이·선택자 문제로만 실패했으면 설정 후보를 추천한다
+      if (!start.failure || /^(content-|ready-selector)/.test(start.failure)) suggestion = await suggestRender(opened.page).catch(() => null);
+      await opened.page.close().catch(() => {});
+    }
+    if (suggestion?.contentSelector && !config.render.contentSelector) {
+      findings.push(`render 설정 후보: contentSelector "${suggestion.contentSelector}", readySelector "${suggestion.readySelector}" (${suggestion.reason})`);
+    }
     const linkStats = { total: 0, inScope: 0, byReason: {} as Record<string, number> };
     const inScope = new Set<string>();
     if (start) {
@@ -93,6 +106,7 @@ export async function runAudit(config: Config, configHash: string, outputDir: st
         elapsedMs: start.elapsedMs,
       },
       links: linkStats,
+      renderSuggestion: suggestion,
       sitemap,
       blockedRequests: blocked,
       egressDenied: summarizeEgressDenied(session.egress.decisions),

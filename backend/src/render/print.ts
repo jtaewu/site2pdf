@@ -43,6 +43,8 @@ export type PrepareResult = {
   /** 텍스트 커버리지 계산용 단어 목록 */
   words: string[];
   probes: number;
+  /** 내용 높이만큼 펼친 같은 사이트 iframe 수 */
+  iframeExpanded: number;
 };
 
 export async function preparePrint(page: Page, render: RenderConfig, pdf: PdfConfig): Promise<PrepareResult> {
@@ -51,7 +53,7 @@ export async function preparePrint(page: Page, render: RenderConfig, pdf: PdfCon
   // 인쇄 폭으로 레이아웃을 맞춘 뒤 측정한다
   await page.setViewportSize({ width: printableWidthPx(pdf), height: 1200 });
   return page.evaluate(
-    ({ contentSelector, hideSelectors, maxProbes }) => {
+    ({ contentSelector, hideSelectors, maxProbes, printCss }) => {
       const root = (contentSelector && document.querySelector(contentSelector)) || document.body;
       // 1) 본문 영역만 남기기 (설정값으로만)
       if (contentSelector && root !== document.body) {
@@ -63,9 +65,14 @@ export async function preparePrint(page: Page, render: RenderConfig, pdf: PdfCon
       const hide = (el: Element) => (el as HTMLElement).style.setProperty('display', 'none', 'important');
       for (const sel of hideSelectors) document.querySelectorAll(sel).forEach(hide);
       let hiddenFixed = 0;
+      // 숨긴 상단 고정 헤더의 아래 끝 (본문이 그만큼 띄워 둔 위쪽 여백을 없애기 위해)
+      let topHeaderBottom = 0;
+      const vw = document.documentElement.clientWidth;
       for (const el of document.querySelectorAll('body *')) {
         const cs = getComputedStyle(el);
         if (cs.position === 'fixed' || cs.position === 'sticky') {
+          const r = el.getBoundingClientRect();
+          if (r.top <= 4 && r.width >= vw * 0.5 && r.height > 0 && r.height < 300) topHeaderBottom = Math.max(topHeaderBottom, r.bottom);
           hide(el);
           hiddenFixed++;
         }
@@ -95,6 +102,56 @@ export async function preparePrint(page: Page, render: RenderConfig, pdf: PdfCon
           }
         }
       }
+      // 숨긴 상단 헤더 높이만큼 띄워 둔 위쪽 여백(본문 바깥 2단계까지)도 제거
+      if (topHeaderBottom > 0) {
+        for (const el of document.querySelectorAll('body, body > *, body > * > *')) {
+          const cs = getComputedStyle(el);
+          for (const prop of ['margin-top', 'padding-top']) {
+            const v = parseFloat(cs.getPropertyValue(prop));
+            if (v >= topHeaderBottom * 0.6 && v <= topHeaderBottom + 40) {
+              (el as HTMLElement).style.setProperty(prop, '0', 'important');
+              resetOffsets++;
+            }
+          }
+        }
+      }
+      // 같은 사이트 iframe은 내용 높이만큼 펼쳐 전체가 인쇄되게 한다 (다른 출처·차단된 iframe은 미지원 경고)
+      let iframeExpanded = 0;
+      let iframeOpaque = 0;
+      for (const f of document.body.querySelectorAll('iframe')) {
+        let inner: Document | null = null;
+        try {
+          inner = (f as HTMLIFrameElement).contentDocument;
+        } catch {}
+        if (inner?.body && inner.documentElement.scrollHeight > 0) {
+          // iframe 문서에도 같은 인쇄 규칙 적용: 인쇄 CSS, 고정 요소 숨김
+          const st = inner.createElement('style');
+          st.textContent = printCss;
+          inner.head?.appendChild(st);
+          let innerHidden = 0;
+          for (const el of inner.querySelectorAll('body *')) {
+            const p = inner.defaultView?.getComputedStyle(el).position;
+            if (p === 'fixed' || p === 'sticky') {
+              (el as HTMLElement).style.setProperty('display', 'none', 'important');
+              innerHidden++;
+            }
+          }
+          if (innerHidden && inner.defaultView) {
+            const iw = inner.documentElement.clientWidth;
+            for (const el of inner.querySelectorAll('body, body *')) {
+              const cs = inner.defaultView.getComputedStyle(el);
+              for (const prop of ['margin-left', 'margin-right', 'padding-left', 'padding-right', 'margin-top', 'padding-top']) {
+                const v = parseFloat(cs.getPropertyValue(prop));
+                if ((prop.endsWith('top') ? v >= 40 && v <= 200 : v >= iw * 0.15)) (el as HTMLElement).style.setProperty(prop, '0', 'important');
+              }
+            }
+          }
+          const s = (f as HTMLElement).style;
+          s.setProperty('height', `${inner.documentElement.scrollHeight + 4}px`, 'important');
+          s.setProperty('width', '100%', 'important');
+          iframeExpanded++;
+        } else iframeOpaque++;
+      }
       // 4) 넘치는 표: 먼저 긴 끊김 없는 토큰(URL·상수명 등)이 있는 셀만 글자 단위 줄바꿈, 그래도 넘치면 표 전체
       let tightTables = 0;
       for (const t of document.querySelectorAll('table')) {
@@ -109,7 +166,8 @@ export async function preparePrint(page: Page, render: RenderConfig, pdf: PdfCon
       }
       // 5) 미지원 콘텐츠
       const unsupported: Record<string, number> = {};
-      for (const tag of ['iframe', 'video', 'audio', 'canvas', 'embed', 'object']) {
+      if (iframeOpaque) unsupported.iframe = iframeOpaque;
+      for (const tag of ['video', 'audio', 'canvas', 'embed', 'object']) {
         const n = document.body.querySelectorAll(tag).length;
         if (n) unsupported[tag] = n;
       }
@@ -133,8 +191,8 @@ export async function preparePrint(page: Page, render: RenderConfig, pdf: PdfCon
 
       const h1 = document.body.querySelector('h1')?.textContent?.replace(/\s+/g, ' ').trim() || null;
       const words = [...new Set(document.body.innerText.split(/\s+/).filter((w) => w.length >= 2))];
-      return { h1, unsupported, overflow: overflow.slice(0, 10).map(({ tag, right }) => ({ tag, right })), tightTables, words, probes: ids.length };
+      return { h1, unsupported, overflow: overflow.slice(0, 10).map(({ tag, right }) => ({ tag, right })), tightTables, words, probes: ids.length, iframeExpanded };
     },
-    { contentSelector: render.contentSelector ?? null, hideSelectors: render.hideSelectors, maxProbes: MAX_PROBES },
+    { contentSelector: render.contentSelector ?? null, hideSelectors: render.hideSelectors, maxProbes: MAX_PROBES, printCss: PRINT_CSS },
   );
 }

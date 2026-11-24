@@ -8,6 +8,8 @@ export type SafeContextOptions = {
   pageOrigins: string[];
   /** 하위 리소스만 추가 허용할 origin (D-09) */
   resourceOrigins?: string[];
+  /** 테스트 전용(자체 서명 fixture 인증서) */
+  ignoreHTTPSErrors?: boolean;
 };
 
 export type SafeContext = { context: BrowserContext; blocked: BlockedRequest[] };
@@ -30,6 +32,7 @@ export async function createSafeContext(browser: Browser, opts: SafeContextOptio
     javaScriptEnabled: true,
     viewport: { width: 1280, height: 900 },
     locale: 'ko-KR',
+    ignoreHTTPSErrors: opts.ignoreHTTPSErrors ?? false,
   });
 
   await context.route('**/*', (route) => {

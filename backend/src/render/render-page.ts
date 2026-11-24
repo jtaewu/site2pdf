@@ -49,6 +49,7 @@ export async function renderPage(context: BrowserContext, url: string, render: R
     out.pdfPages = text.pages;
     out.qa = { coverage: cov.ratio, missingSamples: cov.missing, overflow: prep.overflow, tightTables: prep.tightTables };
     for (const [tag, n] of Object.entries(prep.unsupported)) out.warnings.push(`unsupported-content:${tag}x${n}`);
+    if (prep.iframeExpanded) out.warnings.push(`iframe-expanded:${prep.iframeExpanded}`);
     if (prep.overflow.length) out.warnings.push(`horizontal-overflow:${prep.overflow.map((o) => o.tag).join(',')}`);
     if (cov.ratio < COVERAGE_WARN) out.warnings.push(`text-coverage:${cov.ratio}`);
     return out;

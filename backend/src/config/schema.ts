@@ -11,6 +11,8 @@ export const crawlSchema = z
     /** MVP는 동시성 1 고정 (공격적 병렬 수집 금지) */
     concurrency: z.literal(1).default(1),
     respectRobotsTxt: z.boolean().default(true),
+    /** 일시적 실패(시간 초과·502/503/504 등) 재시도 횟수. 보안 차단·접근 거부는 재시도하지 않음 */
+    retries: z.number().int().min(0).max(3).default(1),
     query: z
       .object({
         policy: z.enum(['drop', 'keep']).default('drop'),

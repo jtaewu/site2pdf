@@ -7,6 +7,7 @@ import { openSession, type SessionOptions } from '../session.ts';
 import { discoverInSession, discoveredDocument, sessionInput } from '../discover/command.ts';
 import { candidatesFromCrawl, planPages, readDiscovered, type Plan } from './plan.ts';
 import { renderPage } from '../render/render-page.ts';
+import { isTransientFailure } from '../discover/retry.ts';
 import { buildCombined, finalizePagePdf, type LinkPolicy, type PagePart } from '../pdf/assemble.ts';
 import { pageFileName, slugify } from '../pdf/filename.ts';
 import { normalizeUrl, scopeExclusionReason } from '../fetch-policy/url.ts';
@@ -102,7 +103,16 @@ export async function runGenerate(config: Config, configHash: string, outputDir:
       lastAt = clock.now();
       const blockedBefore = session.blocked.length;
       log.info(`렌더링 ${order}/${plan.pages.length}: ${planned.path}`);
-      const r = await renderPage(session.context, planned.url, config.render, config.pdf, config.crawl.timeoutMs);
+      let r = await renderPage(session.context, planned.url, config.render, config.pdf, config.crawl.timeoutMs);
+      let attempts = 1;
+      while (isTransientFailure(r.failure) && attempts <= config.crawl.retries) {
+        log.warn(`일시적 실패(${r.failure}) → 재시도 ${attempts}/${config.crawl.retries}: ${planned.path}`);
+        await clock.sleep(Math.max(delay, 1000));
+        lastAt = clock.now();
+        attempts++;
+        r = await renderPage(session.context, planned.url, config.render, config.pdf, config.crawl.timeoutMs);
+      }
+      if (attempts > 1) r.warnings.push(`retried:${attempts - 1}`);
       const blocked = session.blocked.slice(blockedBefore).map((b) => `${b.type} ${b.url}`);
       let failure = r.failure;
       if (!failure) {

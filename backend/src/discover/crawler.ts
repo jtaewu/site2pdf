@@ -4,6 +4,7 @@ import { normalizeUrl, scopeExclusionReason, type Scope } from '../fetch-policy/
 import type { PageLoader } from '../browser/page-loader.ts';
 import type { SelectionResult } from './selection.ts';
 import { silentLogger, type Logger } from '../report/logger.ts';
+import { isTransientFailure } from './retry.ts';
 
 export type PageRecord = {
   order: number;
@@ -21,6 +22,8 @@ export type PageRecord = {
   selected: boolean;
   selectionReason?: string;
   elapsedMs: number;
+  /** 시도 횟수 (재시도 포함) */
+  attempts: number;
 };
 
 export type ExcludedRecord = { url: string; reason: string; foundOn: string | null };
@@ -113,7 +116,17 @@ export async function crawl(input: CrawlInput): Promise<CrawlResult> {
     lastRequestAt = clock.now();
     requests++;
     log.debug(`방문 ${pages.length + 1}: ${item.url}`);
-    const r = await input.load(item.url);
+    let r = await input.load(item.url);
+    let attempts = 1;
+    // 일시적 실패만 제한 횟수 재시도 (요청 간격은 그대로 지킨다)
+    while (isTransientFailure(r.failure) && attempts <= (limits.retries ?? 0)) {
+      log.warn(`일시적 실패(${r.failure}) → 재시도 ${attempts}/${limits.retries}: ${item.url}`);
+      await clock.sleep(Math.max(delay, 1000));
+      lastRequestAt = clock.now();
+      requests++;
+      attempts++;
+      r = await input.load(item.url);
+    }
 
     const rec: PageRecord = {
       order: pages.length + 1,
@@ -128,6 +141,7 @@ export async function crawl(input: CrawlInput): Promise<CrawlResult> {
       textLength: r.textLength,
       selected: false,
       elapsedMs: r.elapsedMs,
+      attempts,
     };
 
     // 리다이렉트 후 최종 URL 재검증 (T-04, SC-08)

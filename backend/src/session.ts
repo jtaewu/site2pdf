@@ -16,6 +16,11 @@ export type SessionOptions = {
   channel?: 'chrome' | 'msedge';
   /** 테스트 전용: DNS 해석기 교체 */
   resolver?: Resolver;
+  /**
+   * 테스트 전용: 루프백 HTTPS fixture로 원격 모드를 검증하기 위한 예외. CLI·설정 파일로는 켤 수 없다.
+   * privateExceptions: 비공개 주소 허용 host:port, portMap: 연결 포트 바꾸기, ignoreHTTPSErrors: 자체 서명 인증서 신뢰
+   */
+  testOnly?: { privateExceptions?: string[]; portMap?: Record<string, number>; ignoreHTTPSErrors?: boolean };
   log?: Logger;
 };
 
@@ -66,14 +71,20 @@ export async function openSession(config: Config, opts: SessionOptions = {}): Pr
       } catch {
         throw new Site2pdfError(ExitCode.INPUT, 'dns-failure', `시작 호스트를 해석할 수 없습니다: ${host}`);
       }
-      const bad = addresses.find((a) => nonPublicIpReason(a));
+      const exempt = opts.testOnly?.privateExceptions?.includes(`${host}:443`) ?? false;
+      const bad = exempt ? undefined : addresses.find((a) => nonPublicIpReason(a));
       if (bad) throw new Site2pdfError(ExitCode.SECURITY, 'start-host-non-public', `시작 호스트가 비공개 주소로 해석됩니다: ${host} → ${bad}`);
       resourceOrigins = config.resources.allowedOrigins;
       const hostPorts = [config.scope.allowedOrigins[0]!, ...resourceOrigins].map((o) => {
         const u = new URL(o);
         return `${u.hostname}:${u.port || 443}`;
       });
-      egress = await startEgressProxy({ allowedHostPorts: hostPorts, resolve: resolver });
+      egress = await startEgressProxy({
+        allowedHostPorts: hostPorts,
+        resolve: resolver,
+        privateExceptions: opts.testOnly?.privateExceptions,
+        portMap: opts.testOnly?.portMap,
+      });
       startUrl = config.startUrl;
       scope = config.scope;
     }
@@ -86,7 +97,7 @@ export async function openSession(config: Config, opts: SessionOptions = {}): Pr
       throw new Site2pdfError(ExitCode.RUN, 'browser-launch-failed', `브라우저 실행 실패: ${(e as Error).message.split('\n')[0]} (npm run browser:install 로 Chromium 설치 필요)`);
     }
     cleanups.push(() => browser.close());
-    const { context, blocked } = await createSafeContext(browser, { pageOrigins: scope.allowedOrigins, resourceOrigins });
+    const { context, blocked } = await createSafeContext(browser, { pageOrigins: scope.allowedOrigins, resourceOrigins, ignoreHTTPSErrors: opts.testOnly?.ignoreHTTPSErrors });
     cleanups.push(() => context.close());
 
     const fetchText: RobotsFetch = async (url) => {

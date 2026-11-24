@@ -5,6 +5,7 @@
 | 0.1 | 2026-11-24 | 초안 |
 | 0.2 | 2026-11-24 | Phase 1 구현에 맞춰 구조·CLI·설정·discovered.json·종료 코드 확정 (D-03, D-06, D-08, D-09, D-11, D-14 반영) |
 | 0.3 | 2026-11-24 | Phase 2: `generate`, `--discovered`, `pdf.*`·`selection.order` 설정, manifest.json·report.md, PDF 링크·북마크 규칙 (D-07, D-10, D-15 반영) |
+| 0.4 | 2026-11-24 | 일시적 실패 재시도(`crawl.retries`), audit 렌더 설정 후보, iframe 펼침 경고, 실행기(`site2pdf.cmd`) |
 
 ## 1. 구조
 ```text
@@ -66,6 +67,7 @@ site2pdf validate --manifest ./output/manifest.json
     "maxPages": 200, "maxDepth": 5, "minDelayMs": 1000, "timeoutMs": 15000, "maxTotalMs": 600000,
     "concurrency": 1,                     // 1 고정
     "respectRobotsTxt": true,
+    "retries": 1,                         // 일시적 실패(시간 초과·502/503/504·연결 끊김)만 재시도. 보안 차단·4xx는 재시도 안 함
     "query": { "policy": "drop", "keepParams": [] }   // drop: keepParams 외 쿼리 제거
   },
   "resources": { "allowedOrigins": [] },  // (원격 전용) 하위 리소스만 추가 허용할 https origin. 보안 검토 후 지정
@@ -114,14 +116,14 @@ site2pdf validate --manifest ./output/manifest.json
 - `blockedRequests[]`: 브라우저 계층에서 막은 요청 요약(유형·origin·건수·예시)
 - `egressDenied[]`: 이그레스 프록시가 거부한 목적지 요약
 ### audit.json
-시작 페이지 상태·리다이렉트·제목, 링크 통계(범위 안 수, 제외 사유별 수), sitemap(보조), 차단 내역, `findings`(사람이 읽는 진단 문장). 요청은 robots.txt·시작 페이지·sitemap.xml 각 1회.
+시작 페이지 상태·리다이렉트·제목, 링크 통계(범위 안 수, 제외 사유별 수), `renderSuggestion`(본문 영역 `contentSelector`·`readySelector` 후보: 첫 h1을 담은 HTML 의미 요소 우선, 없으면 본문 텍스트 50% 이상을 담는 가장 작은 영역), sitemap(보조), 차단 내역, `findings`(사람이 읽는 진단 문장). 요청은 robots.txt·시작 페이지·sitemap.xml 각 1회.
 ### manifest.json (generate)
 - 메타: discovered.json과 같은 항목 + `discoveredFrom`(파일 경로 또는 `inline-discover`)
 - `summary`: `planned`, `rendered`, `failed`, `skipped`, `warnings`
 - `combined`: `file`, `pages`, `outlineEntries`, `links`(`gotos` 내부 이동, `anchorExact` 앵커 위치까지 정확, `removed`, `kept` 외부 유지, `brokenNamed`)
 - `pages[]`: `order`, `url`, `path`, `title`, `titleSource`(h1|title|path), `status`(rendered|failed), `failure`, `pdfFile`, `pdfPages`, `combinedStartPage`, `warnings`, `qa`(`coverage`, `overflow`, `tightTables`, `missingSamples`), `blocked`, `elapsedMs`
 - `skipped[]`: 변환 대상에서 빠진 경로와 사유(discover 실패, 선택 제외, 범위 밖, 중복, robots)
-- 경고: `unsupported-content:<태그>x<수>`, `horizontal-overflow:<태그>`, `text-coverage:<비율>`(0.99 미만), `blocked-requests:<수>`, `duplicate-title`
+- 경고: `unsupported-content:<태그>x<수>`(다른 출처·차단 iframe, video, canvas 등), `iframe-expanded:<수>`(같은 사이트 iframe을 내용 높이만큼 펼쳐 인쇄), `horizontal-overflow:<태그>`, `text-coverage:<비율>`(0.99 미만), `blocked-requests:<수>`, `duplicate-title`, `retried:<수>`
 ### report.md
 사람이 읽는 요약(결과·페이지 표·제외·차단·경고 의미)과 육안 검수 체크리스트(07 §3).
 ### PDF 파일
@@ -136,4 +138,4 @@ site2pdf validate --manifest ./output/manifest.json
 | `0` | 모든 필수 단계 성공 | 한도(maxPages 등) 도달은 성공이되 `message`·`stopReason`에 표시 |
 | `2` | 입력·설정·권한 확인 실패 | 잘못된 URL·설정, robots 금지·확인 실패, 401/403/429, `--discovered` 설정 불일치 |
 | `3` | 탐색·렌더링·변환 실패 | 일부 페이지 실패(통합 PDF는 성공 페이지만으로 만들되 실패로 표시), 시작 페이지 실패, 변환 대상 0개, 브라우저 실행 실패 |
-| `4` | 보안 정책 위반 | 시작 호스트가 비공개 주소로 해석, 시작 페이지가 범위 밖으로 리다이렉트 |
+| `4` | 보안 정책 위반 | 시작 호스트가 비공개 주소로 해석, 시작 페이지가 범위 밖이나 이그레스 차단 목적지(내부 IP 등)로 리다이렉트 |

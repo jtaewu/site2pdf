@@ -8,7 +8,7 @@
     "node": ">=24"
   },
   "scripts": {
-    "cli": "node src/cli/bin.ts",
+    "cli": "node scripts/cli.mjs",
     "typecheck": "tsc --noEmit",
     "test": "node scripts/vitest.mjs run",
     "test:unit": "node scripts/vitest.mjs run tests/unit",
@@ -27,5 +27,8 @@
     "@types/picomatch": "^4.0.3",
     "typescript": "^7.0.2",
     "vitest": "^5.1.0"
+  },
+  "bin": {
+    "site2pdf": "scripts/cli.mjs"
   }
 }

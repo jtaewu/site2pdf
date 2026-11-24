@@ -20,6 +20,8 @@ export type EgressPolicy = {
   privateExceptions?: string[];
   resolve?: Resolver;
   connectTimeoutMs?: number;
+  /** 테스트 전용: `host:port` → 실제 연결할 포트 (루프백 fixture가 임의 포트에서 열리므로) */
+  portMap?: Record<string, number>;
 };
 
 export type EgressDecision = {
@@ -89,7 +91,7 @@ export async function startEgressProxy(policy: EgressPolicy): Promise<EgressProx
     delete headers['proxy-connection'];
     delete headers['proxy-authorization'];
     const upstream = http.request(
-      { host: d.address, port, method: req.method, path: target.pathname + target.search, headers, timeout, setHost: false },
+      { host: d.address, port: policy.portMap?.[key(target.hostname, port)] ?? port, method: req.method, path: target.pathname + target.search, headers, timeout, setHost: false },
       (up) => {
         res.writeHead(up.statusCode ?? 502, up.headers);
         up.pipe(res);
@@ -117,7 +119,7 @@ export async function startEgressProxy(policy: EgressPolicy): Promise<EgressProx
       socket.end('HTTP/1.1 403 Forbidden\r\n\r\n');
       return;
     }
-    const upstream = net.connect({ host: d.address, port, timeout });
+    const upstream = net.connect({ host: d.address, port: policy.portMap?.[key(m[1], port)] ?? port, timeout });
     upstream.once('connect', () => {
       upstream.setTimeout(0);
       socket.write('HTTP/1.1 200 Connection Established\r\n\r\n');

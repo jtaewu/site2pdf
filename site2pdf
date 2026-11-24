@@ -1,0 +1,3 @@
+#!/usr/bin/env sh
+# site2pdf 실행기 (macOS/Linux/Git Bash). 예: ./site2pdf generate --source ./site -o output
+exec node "$(dirname "$0")/backend/scripts/cli.mjs" "$@"

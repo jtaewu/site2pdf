@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { crawl, type Clock, type CrawlInput } from '../../src/discover/crawler.ts';
 import { crawlSchema } from '../../src/config/schema.ts';
 import { createSelector } from '../../src/discover/selection.ts';
+import { isTransientFailure } from '../../src/discover/retry.ts';
 import type { LoadResult } from '../../src/browser/page-loader.ts';
 
 const O = 'https://site.test';
@@ -187,6 +188,41 @@ describe('T-04 리다이렉트 이탈 / SC-12 부분 실패', () => {
   it('시작 페이지만 실패하면 start-failed', async () => {
     const r = await crawl(base(fakeSite({}).load));
     expect(r.stopReason).toBe('start-failed');
+  });
+});
+
+describe('일시적 실패 재시도 (06 §5)', () => {
+  it('시간 초과는 retries만큼 다시 시도해 성공하면 성공으로 기록', async () => {
+    let calls = 0;
+    const flaky = fakeSite({ '/docs/': () => (++calls === 1 ? { failure: 'render-timeout' } : {}) });
+    const clock = fakeClock();
+    const r = await crawl(base(flaky.load, { clock }, { retries: 1 }));
+    expect(r.pages[0]).toMatchObject({ status: 'ok', attempts: 2 });
+    expect(r.requests).toBe(2);
+    expect(clock.slept).toEqual([1000]); // 재시도 전 최소 1초 대기
+  });
+
+  it('재시도해도 실패하면 실패로 남는다', async () => {
+    const site = fakeSite({ '/docs/': { failure: 'render-timeout' } });
+    const r = await crawl(base(site.load, {}, { retries: 2 }));
+    expect(r.pages[0]).toMatchObject({ status: 'failed', failure: 'render-timeout', attempts: 3 });
+  });
+
+  it.each(['http-404', 'http-403', 'egress-blocked:host-not-allowed', 'content-too-short', 'navigation-error: net::ERR_BLOCKED_BY_CLIENT'])(
+    '%s 는 재시도하지 않는다',
+    async (failure) => {
+      const site = fakeSite({ '/docs/': { failure, status: failure.startsWith('http-') ? Number(failure.slice(5)) : 200 } });
+      const r = await crawl(base(site.load, {}, { retries: 3 }));
+      expect(site.visits).toHaveLength(1);
+      expect(r.pages[0]?.attempts).toBe(1);
+    },
+  );
+
+  it.each([
+    ['render-timeout', true], ['pdf-timeout', true], ['http-503', true], ['navigation-error: page.goto: Timeout 15000ms exceeded', true],
+    ['navigation-error: net::ERR_CONNECTION_RESET', true], ['navigation-error: net::ERR_TUNNEL_CONNECTION_FAILED', false], ['http-500', false], [undefined, false],
+  ])('isTransientFailure(%s) = %s', (f, expected) => {
+    expect(isTransientFailure(f)).toBe(expected);
   });
 });
 
