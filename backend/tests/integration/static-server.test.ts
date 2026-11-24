@@ -99,6 +99,24 @@ describe('T-16 로컬 정적 서버 경계', () => {
     expect(status).toBe(421);
   });
 
+  it('끝에 / 없는 폴더 주소는 같은 서버 안 /로 리다이렉트, 외부 주소로는 만들지 않는다', async () => {
+    const r1 = await new Promise<{ status: number; location?: string }>((resolve, reject) => {
+      const u = new URL(srv.origin);
+      const req = http.request({ host: u.hostname, port: u.port, path: '/docs' }, (res) => {
+        res.resume();
+        resolve({ status: res.statusCode ?? 0, location: res.headers.location });
+      });
+      req.on('error', reject);
+      req.end();
+    });
+    expect(r1).toEqual({ status: 301, location: '/docs/' });
+    // //host 형태 요청도 외부 이동 주소를 만들지 않는다
+    for (const p of ['//evil.example/docs', '/\\evil.example/docs']) {
+      const r = await raw(p);
+      expect([301, 403, 404]).toContain(r.status);
+    }
+  });
+
   it('루프백에만 바인딩된다', () => {
     expect(new URL(srv.origin).hostname).toBe('127.0.0.1');
   });

@@ -69,6 +69,22 @@ describe('로컬 정적 사이트 (fixtures/static-site)', () => {
   });
 });
 
+describe('문서 사이트 빌드 구조 (fixtures/docs-style-site)', () => {
+  it('끝에 / 없는 폴더 링크(/docs/intro)와 확장자 없는 링크(/docs/setup → setup.html)를 일반 웹서버처럼 찾는다', async () => {
+    const out = tmpOut();
+    const code = await main(['discover', '--source', path.join(FIX, 'docs-style-site'), '-c', writeCfg(out, { mode: 'local', sourcePath: '.', crawl: { minDelayMs: 0 } }), '-o', out]);
+    const d = JSON.parse(fs.readFileSync(path.join(out, 'discovered.json'), 'utf8'));
+    const rows = d.pages.map((p: { path: string; status: string; failure?: string }) => [p.path, p.status, p.failure ?? '']);
+    expect(rows).toEqual([
+      ['/', 'ok', ''], ['/docs/intro', 'ok', ''], ['/docs/setup', 'ok', ''], ['/docs/api/payment', 'ok', ''],
+    ]);
+    expect(code).toBe(0);
+    // /docs/intro 와 /docs/intro/ 는 같은 페이지로 한 번만 방문
+    expect(d.pages[1].finalUrl).toMatch(/\/docs\/intro\/$/);
+    expect(d.excluded.map((e: { reason: string }) => e.reason)).not.toContain(expect.stringMatching(/^http-404/));
+  });
+});
+
 describe('로컬 SPA (fixtures/spa-site)', () => {
   const spa = (render: Record<string, unknown> = {}) => ({
     mode: 'local', sourcePath: path.join(FIX, 'spa-site'), startPath: '/app/', spaFallbackPrefix: '/app/',

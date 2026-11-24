@@ -20,7 +20,29 @@ export type StaticServerOptions = {
   spaFallbackPrefix?: string;
 };
 
-/** 루트 안 파일이면 실제 경로, 아니면 null */
+export type Resolved = { file: string } | { status: 403 | 404 } | { redirect: string };
+
+/**
+ * 일반 정적 호스팅(nginx·GitHub Pages 등)과 같은 규칙으로 URL 경로를 파일에 대응시킨다.
+ *  - `/a/` → `a/index.html`
+ *  - `/a` 가 폴더이고 `a/index.html`이 있으면 `/a/`로 리다이렉트 (문서 사이트 빌드의 기본 링크 형태)
+ *  - `/a` 가 없고 확장자가 없으면 `a.html` 시도 (trailingSlash: false 빌드)
+ * 보안 검사(루트 밖·숨김 파일)는 모든 후보에 똑같이 적용된다.
+ */
+export function resolveSitePath(realRoot: string, urlPath: string): Resolved {
+  const direct = resolveInsideRoot(realRoot, urlPath);
+  if (!('status' in direct) || direct.status !== 404 || urlPath.endsWith('/')) return direct;
+  const asDir = resolveInsideRoot(realRoot, `${urlPath}/`);
+  // 앞의 / 를 하나로 정규화: '//host' 같은 외부 이동 주소가 만들어지지 않게
+  if ('file' in asDir) return { redirect: `/${urlPath.replace(/^\/+/, '')}/` };
+  if (!path.posix.extname(urlPath)) {
+    const asHtml = resolveInsideRoot(realRoot, `${urlPath}.html`);
+    if ('file' in asHtml) return asHtml;
+  }
+  return direct;
+}
+
+/** 루트 안 파일이면 실제 경로, 아니면 403/404 */
 export function resolveInsideRoot(realRoot: string, urlPath: string): { file: string } | { status: 403 | 404 } {
   let decoded: string;
   try {
@@ -63,8 +85,14 @@ export async function startStaticServer(root: string, opts: StaticServerOptions 
       res.writeHead(405).end();
       return;
     }
-    const pathname = new URL(req.url ?? '/', 'http://local').pathname;
-    let r = resolveInsideRoot(realRoot, pathname);
+    const u = new URL(req.url ?? '/', 'http://local');
+    const pathname = u.pathname;
+    let r: Resolved = resolveSitePath(realRoot, pathname);
+    if ('redirect' in r) {
+      // 같은 서버 안 상대 경로로만 이동 (쿼리 유지)
+      res.writeHead(301, { location: r.redirect + u.search }).end();
+      return;
+    }
     if ('status' in r && r.status === 404 && opts.spaFallbackPrefix && pathname.startsWith(opts.spaFallbackPrefix)) {
       r = resolveInsideRoot(realRoot, '/index.html');
     }

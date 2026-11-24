@@ -91,8 +91,9 @@ export async function runGenerate(config: Config, configHash: string, outputDir:
     const pagesDir = path.join(outputDir, 'pdf', 'pages');
     fs.mkdirSync(pagesDir, { recursive: true });
     clearOldPagePdfs(pagesDir);
-    const policy: LinkPolicy = { normalize: (u) => normalizeUrl(u, u, query), siteOrigin: origin, local: config.mode === 'local' };
-    const includedSet = new Set(plan.pages.map((p) => p.url));
+    // 링크 비교 키: 정적 호스팅에서 같은 페이지인 /a, /a/, /a/index.html, /a.html 을 하나로 본다
+    const policy: LinkPolicy = { normalize: (u) => pageKey(normalizeUrl(u, u, query)), siteOrigin: origin, local: config.mode === 'local' };
+    const includedSet = new Set(plan.pages.map((p) => policy.normalize(p.url)!));
     const robotsDelay = session.robots.state === 'present' ? Math.round((session.robots.crawlDelaySec ?? 0) * 1000) : 0;
     const delay = Math.max(config.crawl.minDelayMs, robotsDelay);
     const started = clock.now();
@@ -254,4 +255,17 @@ function chapterTitle(h1: string | null, docTitle: string, p: string): { title: 
 
 function emptyPage(order: number, url: string, p: string, title: string, failure: string): ManifestPage {
   return { order, url, path: p, title: title || p, titleSource: 'title', status: 'failed', failure, pdfFile: null, pdfPages: 0, combinedStartPage: null, warnings: [], qa: null, blocked: [], sensitive: [], elapsedMs: 0 };
+}
+
+/** 정적 호스팅에서 같은 페이지를 가리키는 주소 변형(/a, /a/, /a/index.html, /a.html)을 하나의 비교 키로 */
+export function pageKey(url: string | null): string | null {
+  if (!url) return null;
+  try {
+    const u = new URL(url);
+    u.pathname = u.pathname.replace(/\/index\.html?$/i, '/').replace(/\.html?$/i, '');
+    if (u.pathname.length > 1 && u.pathname.endsWith('/')) u.pathname = u.pathname.slice(0, -1);
+    return u.href;
+  } catch {
+    return url;
+  }
 }

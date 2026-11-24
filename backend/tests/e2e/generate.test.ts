@@ -236,3 +236,17 @@ describe('Phase 3: 그룹별 PDF·validate·출력 경로 보호 (FR-11, SC-05, 
     expect(fs.existsSync(path.join(FIX, 'static-site', 'out'))).toBe(false);
   });
 });
+
+describe('문서 사이트 빌드 구조 generate (fixtures/docs-style-site)', () => {
+  it('/a, /a/, /a.html 형태가 섞인 링크도 통합 PDF 안 이동으로 모두 살린다', async () => {
+    const out = tmp();
+    const code = await main(['generate', '--source', path.join(FIX, 'docs-style-site'), '-c', writeCfg(out, { mode: 'local', sourcePath: '.', crawl: { minDelayMs: 0 } }), '-o', out]);
+    expect(code).toBe(0);
+    const m = readJson(path.join(out, 'manifest.json'));
+    expect(m.pages.map((p: { title: string }) => p.title)).toEqual(['문서 사이트형 fixture', '소개', '설정', '결제 API']);
+    // 홈→소개, 소개→설정(../setup), 소개→결제(../api/payment), 설정→소개(/docs/intro/) 4개 모두 내부 이동
+    expect(m.combined.links).toMatchObject({ gotos: 4, removed: 0 });
+    // 고정 사이드바 자리 여백 없이 본문이 인쇄된다
+    for (const p of m.pages) expect(p.qa.overflow).toEqual([]);
+  }, 120_000);
+});
