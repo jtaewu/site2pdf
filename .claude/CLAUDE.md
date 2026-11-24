@@ -1,43 +1,51 @@
-# site2pdf의 최상위 지침
+# site2pdf 최상위 지침
 
-> 새 프로젝트를 시작하면 `{{ }}` 부분을 채우고, 문서가 생길 때마다 '문서 목록' 표를 갱신한다.
-> 진행 순서는 `docs/0-ai-dev-guide.md`를 따른다.
+승인된 웹사이트 URL 또는 로컬 정적 사이트를 안전하게 탐색해 PDF로 변환하는 범용 CLI. 특정 고객사(KICC 등) 전용이 아니다.
 
 ## 반드시 지켜야 할 지침
 
-- 모든 응답은 한국어로 할 것
-- 오버엔지니어링 금지
-- 문서에 없는 요구사항·기능을 임의로 추가하지 말 것. 필요하면 '가정·미결 사항'에 기록하고 사용자에게 확인할 것
+- 모든 응답·문서·커밋 설명은 한국어로 쓴다(코드 식별자는 영어).
+- 최상위 개발 지침은 `docs/00-ai-dev-guide.md`. 충돌하면 그 문서가 우선한다.
+- `docs/02-prd.md`의 요구사항만 구현한다. 범위 확장은 `docs/09-open-questions.md`에 제안하고 승인 전 개발하지 않는다.
+- Phase가 끝나면 보고하고 **사용자 승인 후** 다음 Phase로 간다(`docs/08-implementation-plan.md`).
+- 오버엔지니어링 금지. 사이트별 규칙은 `config/examples/`에만 두고 엔진에 하드코딩하지 않는다.
+- 무단 수집·인증 우회·차단 우회 금지. `docs.kicc.co.kr`에 접근하거나 재시도하지 않는다.
+- 브라우저 트래픽은 반드시 이그레스 프록시를 거친다(ADR-004). 보안 계층을 약하게 만드는 변경은 테스트와 함께 사용자 승인을 받는다.
 
-## 프로젝트의 디렉토리 구조
+## 디렉터리 구조
 
-- 백엔드 : backend/
-- 프론트엔드 : frontend/
-- 문서 : docs/
-- 문서 생성 프롬프트 : prompts/
+| 경로 | 내용 |
+|---|---|
+| `backend/` | 변환 엔진 + CLI (Node 24, TypeScript, Playwright Chromium) |
+| `backend/src/` | `cli`, `config`, `fetch-policy`(URL·IP·이그레스 프록시), `local`, `browser`, `discover`, `audit`, `report` |
+| `backend/tests/` | `unit`(네트워크 없음), `integration`(루프백 소켓), `e2e`(브라우저) |
+| `frontend/` | 예약 폴더. GUI는 MVP 범위 밖 |
+| `config/examples/` | 설정 예시 |
+| `fixtures/` | 테스트용 사이트(정적, SPA, 보안) |
+| `poc/` | Phase 0 PoC (폐기용, 재사용 금지) |
+| `docs/`, `docs/adr/` | 요구사항·설계·결정 기록 |
+| `output/` | 실행 결과(git 제외, `output/audit-report.md`만 추적) |
 
-## 문서 작성 공통 규칙
+## 개발 명령 (backend/ 에서)
 
-- 모든 문서는 맨 위에 '버전 이력'과 '변경 이력' 표를 두고, 수정할 때마다 버전을 올려 기록한다(형식은 `docs/0-ai-dev-guide.md` 5장).
-- 규칙·요구사항·화면은 다른 문서에서 재정의하지 않고 ID(BR-01, FR-01, SN-01 등)로 참조한다.
-- 확정되지 않은 내용은 각 문서 마지막의 '가정·미결 사항' 표에 ID를 붙여 남긴다.
-- 문서를 수정하면 그 문서를 참조하는 다른 문서와 불일치가 없는지 확인한다.
+- `npm run browser:install`: 전용 Chromium 설치(최초 1회)
+- `npm run typecheck`: 타입 검사
+- `npm test`: 전체 테스트(브라우저 E2E 포함). Windows에서는 반드시 `npm test`로 실행(`scripts/vitest.mjs`가 드라이브 대소문자 문제를 피함)
+- `npm run cli -- discover --source ../fixtures/static-site -o ../output`
 
 ## 문서 목록
 
-경로는 저장소 루트 기준. 필요할 때 해당 문서를 읽을 것. (작성 전인 문서는 '상태'를 미작성으로 둔다)
-
-| 문서                     | 경로                          | 내용                                     | 상태   |
-| ------------------------ | ----------------------------- | ---------------------------------------- | ------ |
-| AI 개발 가이드           | `docs/0-ai-dev-guide.md`      | 문서 작성 순서, 문서 규칙, 개발 진행 방식 | 작성됨 |
-| 도메인 정의서            | `docs/1-domain-definition.md` | 용어, 비즈니스 규칙(BR), 상태 정의        | 미작성 |
-| PRD                      | `docs/2-PRD.md`               | 기능·비기능 요구사항(FR/NFR), 범위        | 미작성 |
-| 사용자 시나리오          | `docs/3-user-scenario.md`     | 화면 흐름별 시나리오(SN)                  | 미작성 |
-| 와이어프레임             | `docs/4-wireframe.md`         | 화면(SC) 구성과 요소                      | 미작성 |
-| 프로젝트 구조 설계 원칙  | `docs/5-project-principle.md` | 폴더 구조, 네이밍, 레이어·테스트·보안 규칙 | 미작성 |
-| 기술 아키텍처 다이어그램 | `docs/6-arch-diagram.md`      | 구성도, 주요 흐름 시퀀스                  | 미작성 |
-| ERD                      | `docs/7-erd.md`               | 테이블·제약·인덱스 명세(ER)               | 미작성 |
-| DB 스키마                | `docs/schema.sql`             | {{DBMS}} DDL 기준본                       | 미작성 |
-| 작업 실행 계획           | `docs/8-plan.md`              | Task 목록·완료 조건·선행 조건, 미결 결정(D) | 미작성 |
-| 스타일 가이드            | `docs/9-style-guide.md`       | 색상·글꼴·CSS 변수, 컴포넌트 스타일 규칙  | 미작성 |
-| API 명세                 | `backend/swagger.yaml`        | OpenAPI 명세, 엔드포인트·요청/응답·에러   | 미작성 |
+| 문서 | 경로 |
+|---|---|
+| AI 개발 최상위 지침 | `docs/00-ai-dev-guide.md` |
+| 입력 진단(Phase 0) | `docs/01-source-audit.md` |
+| PRD | `docs/02-prd.md` |
+| 사용자 시나리오 | `docs/03-user-scenarios.md` |
+| 기능·CLI·설정 명세 | `docs/04-functional-spec.md` |
+| 아키텍처 | `docs/05-architecture.md` |
+| 기술 설계 | `docs/06-technical-design.md` |
+| 테스트·인수 계획 | `docs/07-test-plan.md` |
+| 단계별 구현 계획 | `docs/08-implementation-plan.md` |
+| 미결 사항·결정 기록 | `docs/09-open-questions.md` |
+| ADR | `docs/adr/ADR-001~004` |
+| Phase 0 진단 보고서 | `output/audit-report.md` |

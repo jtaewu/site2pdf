@@ -1,13 +1,13 @@
 # ADR-001. 렌더링 엔진과 실행 런타임
 
-- 상태: **제안 (Phase 0, 사용자 승인 대기)**
+- 상태: **승인됨** (2026-11-24, Phase 0 결정 D-01~D-15 권장안 확정)
 - 날짜: 2026-11-24
 - 근거: `output/audit-report.md` §3, §4.1
 
 ## 맥락
 PRD FR-06~08, SC-09는 JS 렌더링 사이트까지 PDF로 만들고 텍스트를 검색할 수 있어야 한다. 05-architecture §4는 Node.js + TypeScript + Playwright + Chromium을 잠정 선택했다.
 
-## 결정(제안)
+## 결정
 1. **Node.js LTS + TypeScript + Playwright(Chromium)** 를 유지한다.
 2. 운영·CI 실행은 **Playwright 전용 Chromium**(또는 컨테이너 이미지)을 쓴다. 사용자 PC의 시스템 Chrome/Edge는 기본값으로 쓰지 않는다.
 3. 브라우저 연결은 Playwright 기본 방식(`--remote-debugging-pipe`)을 쓴다. 디버깅 TCP 포트는 열지 않는다.

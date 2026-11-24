@@ -1,13 +1,13 @@
 # ADR-004. 네트워크 격리와 SSRF 방어
 
-- 상태: **제안 (Phase 0, 사용자 승인 대기)**
+- 상태: **승인됨** (2026-11-24, Phase 0 결정 D-01~D-15 권장안 확정)
 - 날짜: 2026-11-24
 - 근거: `output/audit-report.md` §5, `output/poc/security.json`, `output/poc/egress-proxy.json`
 
 ## 맥락
 00-ai-dev-guide 규칙 5·6, 06-technical-design §2, T-02~05/T-17. 렌더링 대상 페이지의 JS와 서버 응답(리다이렉트)은 신뢰할 수 없다.
 
-## 결정(제안) — 4단 방어
+## 결정 — 4단 방어
 | 층 | 내용 | 막는 것 |
 |---|---|---|
 | L-A 입력 검증 | 원격: `https:`만 허용, userinfo 거부, 허용 포트(443), IP 리터럴·`localhost`·`*.internal` 거부, WHATWG URL 정규화 후 판정 | 잘못된 입력(T-02, T-03 일부) |

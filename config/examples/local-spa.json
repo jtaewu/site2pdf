@@ -1,0 +1,9 @@
+{
+  "mode": "local",
+  "sourcePath": "../../fixtures/spa-site",
+  "startPath": "/app/",
+  "spaFallbackPrefix": "/app/",
+  "scope": { "pathPrefixes": ["/app"] },
+  "crawl": { "maxPages": 50, "minDelayMs": 0, "timeoutMs": 5000 },
+  "render": { "readySelector": "main h1", "contentSelector": "main" }
+}

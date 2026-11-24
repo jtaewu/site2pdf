@@ -17,7 +17,7 @@ flowchart TD
 
 ## 2. 주요 모듈
 - **Input/Audit**: URL/로컬 입력과 접근·복제 승인, 구조·의존성 확인.
-- **Fetch Policy**: SSRF 보호, DNS/리다이렉트/리소스 요청 검증, origin·path·robots·rate 제한.
+- **Fetch Policy**: SSRF 보호, DNS/리다이렉트/리소스 요청 검증, origin·path·robots·rate 제한. 브라우저 트래픽 전체를 받는 **이그레스 프록시**(해석→IP 검사→그 IP로 연결)를 포함한다 (ADR-004).
 - **Discover**: 링크 수집, URL 정규화, 순환·중복 방지, 깊이와 페이지 수 제한.
 - **Select**: 발견 목록에 include/exclude/수동 순서를 적용.
 - **Render**: Playwright 프린트 렌더링, 대기 조건, 화면 UI 제외, 자산 실패 보고.
@@ -31,11 +31,13 @@ flowchart TD
 4. **리소스**: 외부 CDN/iframe/다운로드는 기본 거부하고, 필요한 경우 명시적 예외는 보안 검토. 렌더링 콘텐츠는 임의 명령 실행에 접근하지 못하게 격리.
 5. **출력**: 경로 탈출 방지, HTML로부터 만든 파일명 정제, 사용자 원본 데이터·시크릿 로그 마스킹. 생성 파일은 자동 대외 배포하지 않음.
 
-## 4. 기술 선택(잠정)
-- Node.js LTS, TypeScript: CLI/URL 정책/데이터 흐름
-- Playwright + Chromium: 브라우저 기반 PDF 렌더링
-- PDF 병합 라이브러리: Phase 0 PoC로 링크/북마크 지원 확인 후 선택
-- 테스트: 단위 테스트 + 로컬 fixture 서버 + 소량 E2E
+## 4. 기술 선택 (Phase 0 ADR 승인으로 확정)
+- Node.js 24 + TypeScript(빌드 없이 Node type stripping으로 실행, `tsc --noEmit`으로 검사): CLI/URL 정책/데이터 흐름
+- Playwright + **전용 Chromium**: 브라우저 탐색·PDF 렌더링 (ADR-001). 시스템 Chrome은 개발 옵션으로만
+- 설정 검증 zod, glob picomatch, robots.txt robots-parser
+- PDF 병합: pdf-lib (ADR-003, Phase 2)
+- 테스트: vitest. 단위(네트워크 없음) + 통합(루프백 소켓) + 브라우저 E2E(로컬 fixture)
+- 코드 위치: `backend/`. `frontend/`는 GUI용 예약 폴더(MVP 범위 밖)
 
 ## 5. 확장 포인트
 특정 사이트 메뉴 분석을 위해 별도 Adapter 인터페이스를 추가할 수 있지만 **MVP는 표준 링크 탐색부터 구현**. KICC 특수 규칙을 코어에 넣지 않는다.

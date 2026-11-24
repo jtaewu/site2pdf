@@ -1,0 +1,20 @@
+{
+  "mode": "remote",
+  "startUrl": "https://docs.example.com/docs/",
+  "scope": {
+    "pathPrefixes": ["/docs"],
+    "denyPatterns": ["/admin", "/logout", "?download="]
+  },
+  "crawl": {
+    "maxPages": 200,
+    "maxDepth": 5,
+    "minDelayMs": 1000,
+    "timeoutMs": 15000,
+    "maxTotalMs": 600000,
+    "respectRobotsTxt": true,
+    "query": { "policy": "drop", "keepParams": [] }
+  },
+  "resources": { "allowedOrigins": [] },
+  "render": { "minTextLength": 20 },
+  "selection": { "include": ["/docs/**"], "exclude": ["/docs/private/**"] }
+}

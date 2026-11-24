@@ -1,10 +1,10 @@
 # ADR-003. 인쇄 렌더링과 통합 PDF 병합
 
-- 상태: **제안 (Phase 0, 사용자 승인 대기)**
+- 상태: **승인됨** (2026-11-24, Phase 0 결정 D-01~D-15 권장안 확정)
 - 날짜: 2026-11-24
 - 근거: `output/audit-report.md` §4.3–4.4, `output/poc/render.json`, `output/poc/merge.json`
 
-## 결정(제안)
+## 결정
 ### 렌더링
 1. `emulateMedia('print')` 후 **범용 인쇄 CSS**를 주입한다(06-technical-design §3 + 표 셀 줄바꿈 + 이미지 최대 폭).
 2. `position: fixed/sticky` 요소는 기본으로 숨긴다(헤더가 본문을 가리는 문제 방지).
