@@ -1,3 +1,3 @@
 @echo off
-rem site2pdf 실행기 (저장소 어디서든 실행 가능). 예: site2pdf.cmd generate --source D:\site -o output
+rem site2pdf launcher (ASCII only so it works with any console code page)
 node "%~dp0backend\scripts\cli.mjs" %*

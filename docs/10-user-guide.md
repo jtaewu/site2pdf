@@ -105,7 +105,8 @@ site2pdf.cmd validate --manifest out/manifest.json
 cd C:\site2pdf
 .\make-offline-bundle.cmd            # 결과: C:\site2pdf-offline
 ```
-`C:\site2pdf-offline`의 `site2pdf-offline.zip.001`(…002…), `restore.cmd`, `안내.txt`와 Node.js 24 설치 파일(.msi)을 옮긴다.
+`C:\site2pdf-offline`의 `site2pdf-offline.pack.001`(…002…), `restore.cmd`, `restore.mjs`, `안내.txt`와 Node.js 24 설치 파일(.msi)을 옮긴다.
+압축·복원은 Node.js 내장 기능만 쓰므로 Windows 버전이나 명령 창 한글 설정(코드 페이지)과 무관하다. 복원 전에 조각마다 SHA-256으로 손상 여부를 확인한다. 반입 제한이 더 작으면 `$env:S2P_PART_MB="90"; .\make-offline-bundle.cmd`처럼 조각 크기를 줄인다.
 
 **내부망 PC에서**
 1. Node.js 설치

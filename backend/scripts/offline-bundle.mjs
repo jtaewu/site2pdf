@@ -1,15 +1,25 @@
-// 내부망(오프라인) 반입 패키지 생성기
-// 인터넷 PC에서 실행: 실행에 꼭 필요한 것만 모아(zip) 190MB 조각으로 나누고, 내부망에서 더블클릭으로 복원하는 restore.cmd를 만든다.
+// 내부망(오프라인) 반입 패키지 생성기 — 인터넷 PC에서 실행
+// 실행에 꼭 필요한 것만 모아 Node.js 내장 기능(gzip)으로 압축하고 190MB 조각으로 나눈다.
+// Windows 기본 도구(tar, Expand-Archive, chcp)에 의존하지 않는다: 내부망 PC마다 버전·코드페이지가 달라 실패할 수 있기 때문.
 //   - 소스: .git·poc·output·node_modules 제외
 //   - 라이브러리: npm ci --omit=dev (테스트·개발 도구 제외)
 //   - 브라우저: chromium_headless_shell·winldd만 (일반 Chromium 제외)
-import { execFileSync, spawnSync } from 'node:child_process';
+// 결과: site2pdf-offline.pack.001(…), restore.cmd(영문 전용), restore.mjs(복원기, 조각 SHA-256 내장), 안내.txt
+import { spawnSync } from 'node:child_process';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { Readable, Writable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
+import { fileURLToPath } from 'node:url';
+import zlib from 'node:zlib';
 
-const PART_BYTES = 190 * 1024 * 1024; // 200MB 제한보다 작게
-const repo = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..', '..');
+// 200MB 제한보다 작게. S2P_PART_MB 로 조각 크기 조절 가능(반입 제한이 더 작을 때·분할 시험용)
+const PART_BYTES = (Number(process.env.S2P_PART_MB) || 190) * 1024 * 1024;
+const MAGIC = 'S2PPACK1\n';
+const here = path.dirname(fileURLToPath(import.meta.url));
+const repo = path.resolve(here, '..', '..');
 const outDir = path.resolve(process.argv[2] ?? 'C:\\site2pdf-offline');
 const log = (m) => console.log(`[bundle] ${m}`);
 const fail = (m) => {
@@ -30,7 +40,7 @@ const work = fs.mkdtempSync(path.join(os.tmpdir(), 's2p-bundle-'));
 const stage = path.join(work, 'site2pdf');
 log(`작업 폴더: ${work}`);
 const SKIP = new Set(['.git', 'poc', 'output', 'node_modules', '.tmp', 'ms-playwright']);
-fs.cpSync(repo, stage, { recursive: true, filter: (src) => !SKIP.has(path.basename(src)) || src === repo });
+fs.cpSync(repo, stage, { recursive: true, filter: (src) => src === repo || !SKIP.has(path.basename(src)) });
 
 // 3) 실행용 라이브러리만 설치
 log('실행용 라이브러리 설치(npm ci --omit=dev)…');
@@ -45,82 +55,117 @@ for (const name of fs.readdirSync(browsersDir)) {
   }
 }
 
-// 5) zip 압축 (Windows 기본 tar.exe)
-const zip = path.join(work, 'site2pdf-offline.zip');
-log('압축 중… (몇 분 걸릴 수 있음)');
-execFileSync('tar.exe', ['-a', '-c', '-f', zip, '-C', stage, '.'], { stdio: 'inherit' });
-
-// 6) 190MB 조각으로 나누기
-fs.mkdirSync(outDir, { recursive: true });
-for (const f of fs.readdirSync(outDir)) if (/^site2pdf-offline\.zip\.\d{3}$/.test(f)) fs.rmSync(path.join(outDir, f));
-const total = fs.statSync(zip).size;
-const fd = fs.openSync(zip, 'r');
-const parts = [];
-const buf = Buffer.alloc(8 * 1024 * 1024);
-for (let off = 0, i = 1; off < total; i++) {
-  const name = `site2pdf-offline.zip.${String(i).padStart(3, '0')}`;
-  const out = fs.openSync(path.join(outDir, name), 'w');
-  let written = 0;
-  while (written < PART_BYTES && off < total) {
-    const n = fs.readSync(fd, buf, 0, Math.min(buf.length, PART_BYTES - written, total - off), off);
-    fs.writeSync(out, buf, 0, n);
-    written += n;
-    off += n;
+// 5) 묶기: [MAGIC] + 반복 [u32 길이][JSON 헤더][파일 바이트] + 끝 표시, 전체 gzip
+function* walk(dir, rel = '') {
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    const r = rel ? `${rel}/${e.name}` : e.name;
+    const full = path.join(dir, e.name);
+    if (e.isDirectory()) {
+      yield { p: r, d: true };
+      yield* walk(full, r);
+    } else if (e.isFile()) yield { p: r, s: fs.statSync(full).size, full };
   }
-  fs.closeSync(out);
-  parts.push({ name, size: written });
 }
-fs.closeSync(fd);
+const header = (obj) => {
+  const json = Buffer.from(JSON.stringify(obj), 'utf8');
+  const len = Buffer.alloc(4);
+  len.writeUInt32LE(json.length);
+  return Buffer.concat([len, json]);
+};
+let fileCount = 0;
+async function* source() {
+  yield Buffer.from(MAGIC);
+  for (const e of walk(stage)) {
+    if (e.d) {
+      yield header({ p: e.p, d: true });
+      continue;
+    }
+    fileCount++;
+    yield header({ p: e.p, s: e.s });
+    for await (const chunk of fs.createReadStream(e.full, { highWaterMark: 1024 * 1024 })) yield chunk;
+  }
+  yield header({ end: true, files: fileCount });
+}
 
-// 7) 복원 스크립트·안내문
-const join = parts.map((p) => `"${p.name}"`).join('+');
-const restore = [
+// 6) 190MB 조각으로 나눠 쓰며 조각별 SHA-256 계산
+fs.mkdirSync(outDir, { recursive: true });
+for (const f of fs.readdirSync(outDir)) if (/^site2pdf-offline\.(pack|zip)\.\d{3}$/.test(f)) fs.rmSync(path.join(outDir, f));
+const parts = [];
+let cur = null;
+const open = () => {
+  const name = `site2pdf-offline.pack.${String(parts.length + 1).padStart(3, '0')}`;
+  cur = { name, fd: fs.openSync(path.join(outDir, name), 'w'), size: 0, hash: crypto.createHash('sha256') };
+  parts.push(cur);
+};
+const close = () => {
+  fs.closeSync(cur.fd);
+  cur.sha256 = cur.hash.digest('hex');
+};
+const splitter = new Writable({
+  write(chunk, _enc, cb) {
+    let off = 0;
+    while (off < chunk.length) {
+      if (!cur || cur.size >= PART_BYTES) {
+        if (cur) close();
+        open();
+      }
+      const n = Math.min(chunk.length - off, PART_BYTES - cur.size);
+      const piece = chunk.subarray(off, off + n);
+      fs.writeSync(cur.fd, piece);
+      cur.hash.update(piece);
+      cur.size += n;
+      off += n;
+    }
+    cb();
+  },
+  final(cb) {
+    if (cur) close();
+    cb();
+  },
+});
+log('압축 중… (몇 분 걸릴 수 있음)');
+await pipeline(Readable.from(source()), zlib.createGzip({ level: 9 }), splitter);
+
+// 7) 복원기·실행기·안내문
+const partsInfo = parts.map((p) => ({ name: p.name, size: p.size, sha256: p.sha256 }));
+const restoreSrc = fs.readFileSync(path.join(here, 'offline-restore.mjs'), 'utf8').replace('/*__PARTS__*/[]', JSON.stringify(partsInfo, null, 2));
+fs.writeFileSync(path.join(outDir, 'restore.mjs'), restoreSrc, 'utf8');
+// restore.cmd 는 ASCII 전용 (내부망 PC의 코드페이지와 무관하게 동작하도록). 한글 안내는 Node가 출력한다.
+const restoreCmd = [
   '@echo off',
-  'chcp 65001 >nul',
   'setlocal',
-  'set "DEST=C:\\site2pdf"',
-  'if not "%~1"=="" set "DEST=%~1"',
   'cd /d "%~dp0"',
-  'echo [1/4] Node.js 확인',
-  'where node >nul 2>nul || (echo Node.js 24 가 설치되어 있지 않습니다. 먼저 Node.js 설치 파일을 실행하세요. & pause & exit /b 1)',
-  ...parts.map((p) => `if not exist "${p.name}" (echo 조각 파일이 없습니다: ${p.name} & pause & exit /b 1)`),
-  'echo [2/4] 조각 합치기',
-  `copy /b ${join} "%TEMP%\\site2pdf-offline.zip" >nul || (echo 합치기 실패 & pause & exit /b 1)`,
-  'echo [3/4] 압축 풀기: %DEST%',
-  'if not exist "%DEST%" mkdir "%DEST%"',
-  'tar.exe -xf "%TEMP%\\site2pdf-offline.zip" -C "%DEST%" 2>nul || powershell -NoProfile -Command "Expand-Archive -Force -LiteralPath $env:TEMP\\site2pdf-offline.zip -DestinationPath $env:DEST" || (echo 압축 풀기 실패 & pause & exit /b 1)',
-  'del "%TEMP%\\site2pdf-offline.zip"',
-  'if not defined S2P_NO_SETX setx PLAYWRIGHT_BROWSERS_PATH "%DEST%\\ms-playwright" >nul',
-  'set "PLAYWRIGHT_BROWSERS_PATH=%DEST%\\ms-playwright"',
-  'echo [4/4] 동작 확인 (샘플 사이트 변환)',
-  'call "%DEST%\\site2pdf.cmd" generate -c "%DEST%\\config\\examples\\local-static.json" -o "%TEMP%\\site2pdf-selftest"',
-  'if errorlevel 1 (echo 동작 확인 실패: 위 메시지를 담당자에게 전달하세요 & pause & exit /b 1)',
+  'where node >nul 2>nul',
+  'if errorlevel 1 (',
+  '  echo [ERROR] Node.js is not installed. Install Node.js 24 LTS first, then run restore.cmd again.',
+  '  pause',
+  '  exit /b 1',
+  ')',
+  'node "%~dp0restore.mjs" %*',
   'echo.',
-  'echo 설치 완료: %DEST%',
-  'echo 새 PowerShell 창에서: cd %DEST% 후  .\\site2pdf.cmd generate --source C:\\sample-site -o C:\\result',
   'pause',
   '',
 ].join('\r\n');
-fs.writeFileSync(path.join(outDir, 'restore.cmd'), restore, 'utf8');
-
+fs.writeFileSync(path.join(outDir, 'restore.cmd'), restoreCmd, 'ascii');
 const guide = [
   'site2pdf 내부망 반입 패키지',
   '',
-  '[옮길 파일] 아래 파일을 한 번에 하나씩 옮기면 됩니다 (각 200MB 미만).',
+  '[옮길 파일] 아래 파일을 옮기면 됩니다 (각 200MB 미만).',
   ...parts.map((p) => `  - ${p.name}  (${(p.size / 1024 / 1024).toFixed(1)}MB)`),
-  '  - restore.cmd, 안내.txt',
+  '  - restore.cmd, restore.mjs, 안내.txt',
   '  - Node.js 24 LTS 설치 파일 (nodejs.org, Windows 64-bit .msi) — 따로 준비',
   '',
   '[내부망 PC에서]',
   '  1. Node.js 설치 파일 실행 (다음 → 완료)',
   '  2. 옮긴 파일을 모두 한 폴더에 모은다 (예: C:\\site2pdf-offline)',
   '  3. restore.cmd 를 더블클릭 → C:\\site2pdf 에 설치되고 샘플 변환까지 자동 확인',
+  '     (다른 위치: 명령 프롬프트에서 restore.cmd D:\\tools\\site2pdf)',
   '  4. 새 PowerShell 창에서:',
   '       cd C:\\site2pdf',
   '       .\\site2pdf.cmd generate --source C:\\sample-site -o C:\\result',
   '     결과: C:\\result\\pdf\\site-combined.pdf',
   '',
-  `생성: ${new Date().toISOString()}  /  전체 ${(total / 1024 / 1024).toFixed(1)}MB, ${parts.length}조각`,
+  `생성: ${new Date().toISOString()}  /  ${fileCount}개 파일, ${parts.length}조각`,
   '',
 ].join('\r\n');
 fs.writeFileSync(path.join(outDir, '안내.txt'), `\ufeff${guide}`, 'utf8');
@@ -128,4 +173,4 @@ fs.writeFileSync(path.join(outDir, '안내.txt'), `\ufeff${guide}`, 'utf8');
 fs.rmSync(work, { recursive: true, force: true });
 log(`완료: ${outDir}`);
 for (const p of parts) log(`  ${p.name}  ${(p.size / 1024 / 1024).toFixed(1)}MB`);
-log('  restore.cmd, 안내.txt');
+log('  restore.cmd, restore.mjs, 안내.txt');
